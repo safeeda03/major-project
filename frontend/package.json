@@ -1,0 +1,27 @@
+{
+  "name": "poshanai-frontend",
+  "version": "1.0.0",
+  "description": "PoshanAI Frontend - React Application",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.0",
+    "axios": "^1.3.0",
+    "chart.js": "^4.2.0",
+    "react-chartjs-2": "^5.2.0",
+    "leaflet": "^1.9.0",
+    "react-leaflet": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "@vitejs/plugin-react": "^3.1.0",
+    "vite": "^4.1.0"
+  }
+}

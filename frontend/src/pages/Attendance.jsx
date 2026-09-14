@@ -1,0 +1,95 @@
+import React, { useState } from 'react';
+import Navbar from '../components/Navbar';
+import Sidebar from '../components/Sidebar';
+import { attendanceAPI } from '../services/api';
+
+const Attendance = () => {
+  const [formData, setFormData] = useState({
+    beneficiary_id: '',
+    date: new Date().toISOString().split('T')[0],
+    status: 'present'
+  });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const response = await attendanceAPI.create(formData);
+      setMessage('Attendance marked successfully!');
+      setFormData({
+        beneficiary_id: '',
+        date: new Date().toISOString().split('T')[0],
+        status: 'present'
+      });
+    } catch (err) {
+      setError(err.message || 'Failed to mark attendance');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="page">
+      <Navbar />
+      <div className="page-content">
+        <Sidebar role="worker" />
+        <main className="main-content">
+          <h2>Attendance Records</h2>
+          <div className="form-container">
+            <h3>Mark Attendance</h3>
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Beneficiary ID</label>
+                <input
+                  type="text"
+                  name="beneficiary_id"
+                  value={formData.beneficiary_id}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Date</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select name="status" value={formData.status} onChange={handleChange} required>
+                  <option value="present">Present</option>
+                  <option value="absent">Absent</option>
+                  <option value="half-day">Half Day</option>
+                </select>
+              </div>
+              <button type="submit" className="submit-btn" disabled={loading}>
+                {loading ? 'Marking...' : 'Mark Attendance'}
+              </button>
+              {message && <div className="success-message">{message}</div>}
+              {error && <div className="error-message">{error}</div>}
+            </form>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default Attendance;
