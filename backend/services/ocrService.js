@@ -1,143 +1,83 @@
-// OCR Service for document processing
-// This service uses Tesseract.js for text extraction
-
+const fs = require('fs');
+const path = require('path');
 const Tesseract = require('tesseract.js');
 
+const DATE_PATTERN = /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})/;
+const VACCINE_PATTERN = /\b(bcg|opv|polio|dpt|pentavalent|mmr|measles|hepatitis\s*b)\b/i;
+const OCR_CACHE_DIRECTORY = path.join(__dirname, '..', '.cache', 'tesseract');
+
 class OCRService {
-  // Process uploaded document/image
   static async processDocument(file) {
+    if (!file || !file.path) {
+      const error = new Error('No image was provided for OCR.');
+      error.statusCode = 400;
+      throw error;
+    }
+
     try {
-      if (!file) {
-        throw new Error('No file provided');
-      }
+      fs.mkdirSync(OCR_CACHE_DIRECTORY, { recursive: true });
+      const result = await Tesseract.recognize(file.path, 'eng', { cachePath: OCR_CACHE_DIRECTORY });
+      const rawText = result.data.text.replace(/\r/g, '').trim();
 
-      // Perform OCR using Tesseract.js
-      const result = await Tesseract.recognize(
-        file.path || file,
-        'eng',
-        {
-          logger: m => console.log(m) // Optional: log progress
-        }
-      );
-
-      const text = result.data.text;
-      
-      // Extract structured data from the OCR text
-      // This is a simple extraction - in production, you'd use more sophisticated parsing
-      const extractedData = this.extractDataFromText(text);
-      
       return {
         success: true,
         data: {
-          rawText: text,
-          ...extractedData,
-          confidence: result.data.confidence,
-          needsVerification: true
+          rawText,
+          ...this.extractDataFromText(rawText),
+          confidence: Number(result.data.confidence.toFixed(1)),
+          needsVerification: true,
         },
-        message: 'OCR processing completed. Please verify the extracted data.'
+        message: rawText
+          ? 'Text was extracted. Please verify every field before saving it.'
+          : 'No readable text was found. Try a sharper, well-lit image with the document filling the frame.',
       };
-    } catch (error) {
-      throw new Error(`OCR Service error: ${error.message}`);
+    } catch (cause) {
+      console.error('OCR processing failed:', cause.message);
+      const error = new Error('Could not read this image. Use a clear JPG, PNG, or WebP image and try again.');
+      error.statusCode = 422;
+      throw error;
     }
   }
 
-  // Extract structured data from OCR text
   static extractDataFromText(text) {
     const extractedData = {
       childName: '',
       dateOfBirth: '',
       parentName: '',
-      vaccinationRecords: []
+      vaccinationRecords: [],
     };
 
-    // Simple pattern matching - in production, use more sophisticated NLP
-    const lines = text.split('\n');
-    
-    lines.forEach(line => {
-      // Try to extract child name (common patterns)
-      if (line.toLowerCase().includes('name') || line.toLowerCase().includes('child')) {
-        const nameMatch = line.match(/name[:\s]+([A-Za-z\s]+)/i);
-        if (nameMatch) extractedData.childName = nameMatch[1].trim();
+    for (const line of text.split('\n').map((value) => value.trim()).filter(Boolean)) {
+      const normalizedLine = line.replace(/\s+/g, ' ');
+      const lowerLine = normalizedLine.toLowerCase();
+
+      if (!extractedData.childName && /child\s*name|name\s*of\s*child/.test(lowerLine)) {
+        const match = normalizedLine.match(/(?:child\s*name|name\s*of\s*child)\s*[:\-]?\s*(.+)$/i);
+        if (match) extractedData.childName = match[1].trim();
       }
-      
-      // Try to extract date of birth
-      if (line.toLowerCase().includes('dob') || line.toLowerCase().includes('birth') || line.toLowerCase().includes('date')) {
-        const dateMatch = line.match(/(\d{2}[-/]\d{2}[-/]\d{4}|\d{4}[-/]\d{2}[-/]\d{2})/);
-        if (dateMatch) extractedData.dateOfBirth = dateMatch[1];
+
+      if (!extractedData.parentName && /parent|mother|father|guardian/.test(lowerLine)) {
+        const match = normalizedLine.match(/(?:parent|mother|father|guardian)(?:\s*name)?\s*[:\-]?\s*(.+)$/i);
+        if (match) extractedData.parentName = match[1].trim();
       }
-      
-      // Try to extract parent name
-      if (line.toLowerCase().includes('parent') || line.toLowerCase().includes('father') || line.toLowerCase().includes('mother')) {
-        const parentMatch = line.match(/parent[:\s]+([A-Za-z\s]+)/i);
-        if (parentMatch) extractedData.parentName = parentMatch[1].trim();
+
+      if (!extractedData.dateOfBirth && /\b(dob|birth|date of birth)\b/.test(lowerLine)) {
+        const match = normalizedLine.match(DATE_PATTERN);
+        if (match) extractedData.dateOfBirth = match[1];
       }
-      
-      // Try to extract vaccination information
-      if (line.toLowerCase().includes('vaccine') || line.toLowerCase().includes('bcg') || line.toLowerCase().includes('polio')) {
-        const vaccineMatch = line.match(/(bcg|polio|dpt|mmr|hepatitis|measles)/i);
-        const dateMatch = line.match(/(\d{2}[-/]\d{2}[-/]\d{4}|\d{4}[-/]\d{2}[-/]\d{2})/);
-        
-        if (vaccineMatch) {
-          extractedData.vaccinationRecords.push({
-            vaccine: vaccineMatch[1].toUpperCase(),
-            date: dateMatch ? dateMatch[1] : '',
-            nextDue: '' // Would need calculation based on vaccine type
-          });
-        }
+
+      const vaccine = normalizedLine.match(VACCINE_PATTERN);
+      if (vaccine) {
+        const date = normalizedLine.match(DATE_PATTERN);
+        extractedData.vaccinationRecords.push({
+          vaccine: vaccine[1].toUpperCase().replace(/\s+/g, ' '),
+          date: date ? date[1] : '',
+          nextDue: '',
+        });
       }
-    });
+    }
 
     return extractedData;
-  }
-  
-  // Verify OCR extracted data
-  static async verifyData(extractedData, verifiedData) {
-    try {
-      // Compare extracted data with verified data
-      // and calculate accuracy
-      
-      let matchedFields = 0;
-      let totalFields = 0;
-      const correctedFields = [];
-      
-      // Compare each field
-      const fieldsToCompare = ['childName', 'dateOfBirth', 'parentName'];
-      
-      fieldsToCompare.forEach(field => {
-        totalFields++;
-        if (extractedData[field] === verifiedData[field]) {
-          matchedFields++;
-        } else if (verifiedData[field] && verifiedData[field] !== extractedData[field]) {
-          correctedFields.push(field);
-        }
-      });
-      
-      const accuracy = totalFields > 0 ? matchedFields / totalFields : 0;
-      
-      return {
-        verified: true,
-        accuracy: accuracy.toFixed(2),
-        correctedFields
-      };
-    } catch (error) {
-      throw new Error(`Data verification error: ${error.message}`);
-    }
-  }
-  
-  // Verify OCR extracted data
-  static async verifyData(extractedData, verifiedData) {
-    try {
-      // Compare extracted data with verified data
-      // and calculate accuracy
-      
-      return {
-        verified: true,
-        accuracy: 0.92,
-        correctedFields: ['childName', 'parentName']
-      };
-    } catch (error) {
-      throw new Error(`Data verification error: ${error.message}`);
-    }
   }
 }
 

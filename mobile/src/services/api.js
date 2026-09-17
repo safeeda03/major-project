@@ -159,19 +159,15 @@ export const API = {
     processDocument: async (file) => {
       const formData = new FormData();
       formData.append('document', file);
-      const response = await api.post('/ocr/process', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await api.post('/ocr/process', formData);
       return response.data;
     },
   },
 
   // Chatbot
   chatbot: {
-    sendMessage: async (message) => {
-      const response = await api.post('/chatbot/message', { message });
+    sendMessage: async (message, history = []) => {
+      const response = await api.post('/chatbot/message', { message, history });
       return response.data;
     },
   },

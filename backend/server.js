@@ -4,6 +4,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 
 // Load environment variables
 dotenv.config();
@@ -16,10 +17,13 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Configure multer for file uploads
+const uploadsDirectory = path.join(__dirname, 'uploads');
+fs.mkdirSync(uploadsDirectory, { recursive: true });
+
+// Configure multer for short-lived OCR image uploads.
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, uploadsDirectory);
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname));
@@ -28,25 +32,21 @@ const storage = multer.diskStorage({
 
 const upload = multer({ 
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|pdf/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (extname && mimetype) {
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+    const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    const extension = path.extname(file.originalname).toLowerCase();
+
+    if (allowedExtensions.has(extension) && allowedMimeTypes.has(file.mimetype)) {
       return cb(null, true);
-    } else {
-      cb(new Error('Only images and PDFs are allowed'));
     }
+
+    const error = new Error('Only JPG, PNG, and WebP images are supported for OCR.');
+    error.statusCode = 400;
+    return cb(error);
   }
 });
-
-// Create uploads directory if it doesn't exist
-const fs = require('fs');
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/poshanai', {
@@ -76,19 +76,25 @@ app.post('/api/ocr/process', upload.single('document'), async (req, res) => {
     const result = await OCRService.processDocument(req.file);
     res.json(result);
   } catch (error) {
-    res.status(500).json({ message: 'OCR processing failed', error: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message || 'OCR processing failed' });
+  } finally {
+    if (req.file?.path) {
+      fs.promises.unlink(req.file.path).catch((error) => {
+        console.warn('Could not remove temporary OCR upload:', error.message);
+      });
+    }
   }
 });
 
 // Chatbot Routes
 app.post('/api/chatbot/message', async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, history } = req.body;
     const ChatbotService = require('./services/chatbotService');
-    const response = await ChatbotService.processMessage(message);
+    const response = await ChatbotService.processMessage(message, history);
     res.json(response);
   } catch (error) {
-    res.status(500).json({ message: 'Chatbot error', error: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message || 'Chatbot error' });
   }
 });
 
@@ -134,8 +140,12 @@ app.get('/api/health-check', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong!', error: err.message });
+  if (err instanceof multer.MulterError) {
+    return res.status(400).json({ message: err.code === 'LIMIT_FILE_SIZE' ? 'OCR images must be 10 MB or smaller.' : err.message });
+  }
+
+  console.error(err.stack || err.message);
+  return res.status(err.statusCode || 500).json({ message: err.message || 'Something went wrong!' });
 });
 
 // Start server

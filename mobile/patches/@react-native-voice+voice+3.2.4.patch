@@ -1,0 +1,20 @@
+diff --git a/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java b/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
+index f22833e..eb4ebb2 100644
+--- a/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
++++ b/node_modules/@react-native-voice/voice/android/src/main/java/com/wenkesj/voice/VoiceModule.java
+@@ -147,6 +147,14 @@ public class VoiceModule extends ReactContextBaseJavaModule implements Recogniti
+   @Override
+   public String getName() {
+     return "RCTVoice";
+   }
+ 
++  // Required by React Native 0.72's NativeEventEmitter contract. Voice events
++  // are emitted by this module; listener bookkeeping happens in JavaScript.
++  @ReactMethod
++  public void addListener(String eventName) {}
++
++  @ReactMethod
++  public void removeListeners(double count) {}
++
+   @ReactMethod
+   public void startSpeech(final String locale, final ReadableMap opts, final Callback callback) {

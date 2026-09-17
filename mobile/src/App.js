@@ -17,6 +17,7 @@ import VaccinationScreen from './screens/VaccinationScreen';
 import AttendanceScreen from './screens/AttendanceScreen';
 import ReportsScreen from './screens/ReportsScreen';
 import ChatbotScreen from './screens/ChatbotScreen';
+import OcrScreen from './screens/OcrScreen';
 import MapScreen from './screens/MapScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
@@ -24,7 +25,7 @@ const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const tabIcon = (route) => ({
-  Dashboard: 'dashboard', Beneficiaries: 'people', Health: 'favorite', Chatbot: 'chat',
+  Dashboard: 'dashboard', Beneficiaries: 'people', Health: 'favorite', Chatbot: 'chat', OCR: 'document-scanner',
   Centres: 'location-city', Map: 'map', Reports: 'assessment', Profile: 'account-circle',
   Child: 'child-care', Vaccination: 'vaccines',
 }[route.name] || 'home');
@@ -41,6 +42,7 @@ function WorkerTabs() {
     <Tab.Screen name="Dashboard" component={WorkerDashboard} />
     <Tab.Screen name="Beneficiaries" component={BeneficiaryScreen} />
     <Tab.Screen name="Health" component={HealthScreen} />
+    <Tab.Screen name="OCR" component={OcrScreen} />
     <Tab.Screen name="Chatbot" component={ChatbotScreen} />
     <Tab.Screen name="Profile" component={ProfileScreen} />
   </Tab.Navigator>;

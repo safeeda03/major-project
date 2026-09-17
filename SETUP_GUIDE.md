@@ -103,6 +103,14 @@ VITE v4.x.x ready in xxx ms
 2. Login with test credentials
 3. Explore different dashboards based on role
 
+## Enable AI Chat, OCR, and Voice
+
+OCR works with JPG, PNG, and WebP images up to 10 MB. The Android app requests camera access only when the user chooses to scan, and microphone access only when they choose voice input.
+
+To enable real AI answers, copy `backend/.env.example` to `backend/.env`, add your server-side `OPENAI_API_KEY`, and restart the backend. Do not put that key in the mobile or frontend app. Set `OPENAI_ENABLE_WEB_SEARCH=true` only if you want the provider to search for current information.
+
+The Android debug build requires JDK 17. In PowerShell, set `JAVA_HOME` to your JDK 17 directory before running `mobile/android/gradlew.bat :app:assembleDebug`.
+
 ## 🔧 Alternative: Test Without MongoDB
 
 If you want to test the UI without MongoDB, you can:

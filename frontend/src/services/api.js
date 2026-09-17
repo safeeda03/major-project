@@ -173,27 +173,18 @@ export const reportAPI = {
 // OCR API
 export const ocrAPI = {
   processDocument: async (file) => {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    return {
-      success: true,
-      data: {
-        childName: 'Extracted Child Name',
-        dateOfBirth: '2023-01-15',
-        parentName: 'Extracted Parent Name',
-        vaccinationRecords: [
-          { vaccine: 'BCG', date: '2023-02-15', nextDue: '2023-08-15' },
-          { vaccine: 'Polio', date: '2023-03-15', nextDue: '2023-09-15' }
-        ],
-        confidence: 0.87,
-        needsVerification: true
-      },
-      message: 'OCR processing completed. Please verify the extracted data.'
-    };
+    const formData = new FormData();
+    formData.append('document', file);
+    const response = await fetch('/api/ocr/process', { method: 'POST', body: formData });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || 'OCR processing failed');
+    return data;
   }
 };
 
 // Chatbot API
-export const chatbotAPI = {
+/* Retired local chatbot mock retained only for historical context.
+const retiredChatbotMock = {
   sendMessage: async (message) => {
     await new Promise(resolve => setTimeout(resolve, 1000));
     
@@ -215,6 +206,20 @@ export const chatbotAPI = {
       timestamp: new Date(),
       category: 'general'
     };
+  }
+};
+*/
+
+export const chatbotAPI = {
+  sendMessage: async (message, history = []) => {
+    const response = await fetch('/api/chatbot/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || 'Could not reach the AI assistant');
+    return data;
   }
 };
 
