@@ -6,10 +6,10 @@ import { LineChart, BarChart } from '../components/Charts';
 
 const WorkerDashboard = () => {
   const stats = [
-    { title: 'Total Beneficiaries', value: '150', subtitle: 'Children registered' },
-    { title: 'Today\'s Attendance', value: '142', subtitle: '94.6% attendance' },
-    { title: 'Vaccination Due', value: '12', subtitle: 'This month' },
-    { title: 'Health Alerts', value: '5', subtitle: 'Action required' }
+    { title: 'Total Beneficiaries', value: '150', subtitle: 'Children registered', to: '/beneficiaries' },
+    { title: 'Today\'s Attendance', value: '142', subtitle: '94.6% attendance', to: '/attendance' },
+    { title: 'Vaccination Due', value: '12', subtitle: 'This month', to: '/vaccination' },
+    { title: 'Health Alerts', value: '5', subtitle: 'Action required', to: '/health' }
   ];
 
   return (

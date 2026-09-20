@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 const Cards = ({ title, value, icon, color }) => {
   return (
@@ -12,13 +13,21 @@ const Cards = ({ title, value, icon, color }) => {
   );
 };
 
-export const StatCard = ({ title, value, subtitle }) => (
-  <div className="stat-card">
+export const StatCard = ({ title, value, subtitle, to }) => {
+  const content = <>
     <h3>{title}</h3>
     <p className="stat-value">{value}</p>
     <p className="stat-subtitle">{subtitle}</p>
-  </div>
-);
+  </>;
+
+  return to ? (
+    <Link to={to} className="stat-card stat-card-link" aria-label={`View ${title}`}>
+      {content}
+    </Link>
+  ) : (
+    <div className="stat-card">{content}</div>
+  );
+};
 
 export const BeneficiaryCard = ({ beneficiary }) => (
   <div className="beneficiary-card">

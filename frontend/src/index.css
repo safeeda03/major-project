@@ -126,6 +126,20 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.stat-card-link {
+  color: inherit;
+  display: block;
+  text-decoration: none;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.stat-card-link:hover,
+.stat-card-link:focus-visible {
+  box-shadow: 0 6px 14px rgba(0,0,0,0.16);
+  outline: none;
+  transform: translateY(-2px);
+}
+
 .stat-card h3 {
   font-size: 0.9rem;
   color: #7f8c8d;
