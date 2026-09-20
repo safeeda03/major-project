@@ -79,8 +79,22 @@ class ChatbotService {
       };
     } catch (cause) {
       console.error('OpenAI chatbot request failed:', cause.message);
-      const error = new Error('The AI assistant is temporarily unavailable. Please try again shortly.');
-      error.statusCode = 503;
+      let message = 'The AI assistant is temporarily unavailable. Please try again shortly.';
+      let statusCode = 503;
+
+      if (cause.code === 'credit_balance_exhausted' || cause.type === 'insufficient_quota') {
+        message = 'The AI assistant needs OpenAI API credits before it can reply. Add credits to the OpenAI project billing page, then try again.';
+        statusCode = 402;
+      } else if (cause.status === 401) {
+        message = 'The AI assistant API key is invalid or has been revoked. Update OPENAI_API_KEY in backend/.env, then restart the server.';
+        statusCode = 401;
+      } else if (cause.status === 429) {
+        message = 'The AI assistant has reached its request limit. Please try again shortly.';
+        statusCode = 429;
+      }
+
+      const error = new Error(message);
+      error.statusCode = statusCode;
       throw error;
     }
   }
