@@ -29,7 +29,7 @@ const Health = () => {
 
     try {
       const response = await healthAPI.create(formData);
-      setMessage('Health record saved successfully!');
+      setMessage(response.message || 'Health record saved successfully!');
       setFormData({
         beneficiary_id: '',
         height: '',

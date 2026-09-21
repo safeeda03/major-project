@@ -26,13 +26,14 @@ exports.getVaccinationById = async (req, res) => {
 // Create new vaccination record
 exports.createVaccination = async (req, res) => {
   try {
-    const { beneficiary_id, vaccine, date, next_due_date } = req.body;
+    const { beneficiary_id, vaccine, date, next_due_date, completed } = req.body;
 
     const vaccination = new Vaccination({
       beneficiary_id,
       vaccine,
       date,
-      next_due_date
+      next_due_date,
+      completed
     });
 
     await vaccination.save();
@@ -49,11 +50,11 @@ exports.createVaccination = async (req, res) => {
 // Update vaccination record
 exports.updateVaccination = async (req, res) => {
   try {
-    const { beneficiary_id, vaccine, date, next_due_date } = req.body;
+    const { beneficiary_id, vaccine, date, next_due_date, completed } = req.body;
 
     const vaccination = await Vaccination.findByIdAndUpdate(
       req.params.id,
-      { beneficiary_id, vaccine, date, next_due_date },
+      { beneficiary_id, vaccine, date, next_due_date, completed },
       { new: true, runValidators: true }
     );
 
@@ -65,6 +66,44 @@ exports.updateVaccination = async (req, res) => {
       message: 'Vaccination record updated successfully',
       vaccination
     });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Mark a due vaccination as completed. Completed vaccinations are excluded from due alerts.
+exports.markVaccinationCompleted = async (req, res) => {
+  try {
+    const vaccination = await Vaccination.findByIdAndUpdate(
+      req.params.id,
+      { completed: true },
+      { new: true, runValidators: true }
+    );
+
+    if (!vaccination) {
+      return res.status(404).json({ message: 'Vaccination record not found' });
+    }
+
+    res.json({ message: 'Vaccination marked as completed', vaccination });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Restore a completed vaccination to due status if it was marked done by mistake.
+exports.markVaccinationIncomplete = async (req, res) => {
+  try {
+    const vaccination = await Vaccination.findByIdAndUpdate(
+      req.params.id,
+      { completed: false },
+      { new: true, runValidators: true }
+    );
+
+    if (!vaccination) {
+      return res.status(404).json({ message: 'Vaccination record not found' });
+    }
+
+    res.json({ message: 'Vaccination marked as due', vaccination });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -95,12 +134,26 @@ exports.getVaccinationsByBeneficiary = async (req, res) => {
   }
 };
 
+// Get every outstanding vaccination, including upcoming due dates, for the dashboard.
+exports.getPendingVaccinations = async (req, res) => {
+  try {
+    const pendingVaccinations = await Vaccination.find({
+      completed: { $ne: true },
+      next_due_date: { $exists: true, $ne: null }
+    }).sort({ next_due_date: 1 });
+    res.json(pendingVaccinations);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // Get due vaccinations
 exports.getDueVaccinations = async (req, res) => {
   try {
     const today = new Date();
     const dueVaccinations = await Vaccination.find({
-      next_due_date: { $lte: today }
+      next_due_date: { $lte: today },
+      completed: { $ne: true }
     });
     res.json(dueVaccinations);
   } catch (error) {

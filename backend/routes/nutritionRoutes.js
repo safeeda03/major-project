@@ -9,11 +9,14 @@ const {
   getNutritionRecordsByBeneficiary
 } = require('../controllers/nutritionController');
 
-// Get all nutrition records
-router.get('/', getAllNutritionRecords);
+// Get nutrition records by beneficiary
+router.get('/beneficiary/:beneficiaryId', getNutritionRecordsByBeneficiary);
 
 // Get nutrition record by ID
 router.get('/:id', getNutritionRecordById);
+
+// Get all nutrition records
+router.get('/', getAllNutritionRecords);
 
 // Create new nutrition record
 router.post('/', createNutritionRecord);
@@ -23,8 +26,5 @@ router.put('/:id', updateNutritionRecord);
 
 // Delete nutrition record
 router.delete('/:id', deleteNutritionRecord);
-
-// Get nutrition records by beneficiary
-router.get('/beneficiary/:beneficiaryId', getNutritionRecordsByBeneficiary);
 
 module.exports = router;

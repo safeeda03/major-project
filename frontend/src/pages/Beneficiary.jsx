@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import { beneficiaryAPI } from '../services/api';
@@ -14,6 +15,23 @@ const Beneficiary = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [beneficiaries, setBeneficiaries] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+
+  const loadBeneficiaries = async () => {
+    try {
+      setListLoading(true);
+      setBeneficiaries(await beneficiaryAPI.getAll());
+    } catch (err) {
+      setError(err.message || 'Failed to load beneficiaries');
+    } finally {
+      setListLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBeneficiaries();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({
@@ -38,10 +56,24 @@ const Beneficiary = () => {
         parent_id: '',
         anganwadi_id: ''
       });
+      await loadBeneficiaries();
     } catch (err) {
       setError(err.message || 'Failed to add beneficiary');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (beneficiary) => {
+    if (!window.confirm(`Remove ${beneficiary.name} (${beneficiary.beneficiary_id})?`)) return;
+
+    try {
+      setError('');
+      await beneficiaryAPI.delete(beneficiary._id);
+      setMessage(`${beneficiary.name} removed successfully.`);
+      await loadBeneficiaries();
+    } catch (err) {
+      setError(err.message || 'Failed to remove beneficiary');
     }
   };
 
@@ -109,6 +141,29 @@ const Beneficiary = () => {
               {message && <div className="success-message">{message}</div>}
               {error && <div className="error-message">{error}</div>}
             </form>
+          </div>
+          <div className="form-container records-container">
+            <h3>Current Beneficiaries ({beneficiaries.length})</h3>
+            {listLoading ? <p>Loading beneficiaries...</p> : (
+              <div className="records-table-wrapper">
+                <table className="records-table">
+                  <thead>
+                    <tr><th>ID</th><th>Name</th><th>Date of Birth</th><th>Gender</th><th>Action</th></tr>
+                  </thead>
+                  <tbody>
+                    {beneficiaries.length ? beneficiaries.map((beneficiary) => (
+                      <tr key={beneficiary._id}>
+                        <td>{beneficiary.beneficiary_id}</td>
+                        <td><Link className="child-link" to={`/beneficiaries/${beneficiary._id}`}>{beneficiary.name}</Link></td>
+                        <td>{new Date(beneficiary.dob).toLocaleDateString()}</td>
+                        <td>{beneficiary.gender}</td>
+                        <td><button type="button" className="delete-btn" onClick={() => handleDelete(beneficiary)}>Delete</button></td>
+                      </tr>
+                    )) : <tr><td colSpan="5">No beneficiaries found.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </main>
       </div>

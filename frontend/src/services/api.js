@@ -1,4 +1,15 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+// Vite forwards /api requests to the local backend during development.
+const API_BASE_URL = '/api';
+
+const request = async (path, options = {}) => {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options,
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.message || 'Request failed');
+  return data;
+};
 
 // Mock login for testing without database
 const mockUsers = {
@@ -37,137 +48,63 @@ export const authAPI = {
 
 // Beneficiary API
 export const beneficiaryAPI = {
-  getAll: async () => {
-    // Mock response
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [
-      { _id: '1', beneficiary_id: 'BEN001', name: 'Rahul Kumar', dob: '2023-01-15', gender: 'male', parent_id: 'USR003', anganwadi_id: 'ANG001' },
-      { _id: '2', beneficiary_id: 'BEN002', name: 'Priya Singh', dob: '2022-06-20', gender: 'female', parent_id: 'USR003', anganwadi_id: 'ANG001' }
-    ];
-  },
-  
-  getById: async (id) => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return { _id: id, beneficiary_id: 'BEN001', name: 'Rahul Kumar', dob: '2023-01-15', gender: 'male', parent_id: 'USR003', anganwadi_id: 'ANG001' };
-  },
-  
-  create: async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { message: 'Beneficiary created successfully', beneficiary: { ...data, _id: Date.now().toString() } };
-  },
-  
-  update: async (id, data) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { message: 'Beneficiary updated successfully', beneficiary: { ...data, _id: id } };
-  },
-  
-  delete: async (id) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { message: 'Beneficiary deleted successfully' };
-  }
+  getAll: () => request('/beneficiaries'),
+  getById: (id) => request(`/beneficiaries/${id}`),
+  create: (data) => request('/beneficiaries', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/beneficiaries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id) => request(`/beneficiaries/${id}`, { method: 'DELETE' })
 };
 
 // Health API
 export const healthAPI = {
-  getAll: async () => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [
-      { _id: '1', beneficiary_id: 'BEN001', height: 75, weight: 9.5, bmi: 16.89, health_status: 'normal', date: '2024-01-15' }
-    ];
-  },
-  
-  create: async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const heightInMeters = data.height / 100;
-    const bmi = (data.weight / (heightInMeters * heightInMeters)).toFixed(2);
-    return { message: 'Health record created successfully', healthRecord: { ...data, bmi, _id: Date.now().toString() } };
-  },
-  
-  getByBeneficiary: async (beneficiaryId) => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [{ _id: '1', beneficiary_id: beneficiaryId, height: 75, weight: 9.5, bmi: 16.89, health_status: 'normal', date: '2024-01-15' }];
-  }
+  getAll: () => request('/health'),
+  create: (data) => request('/health', { method: 'POST', body: JSON.stringify(data) }),
+  getByBeneficiary: (id) => request(`/health/beneficiary/${id}`),
+  delete: (id) => request(`/health/${id}`, { method: 'DELETE' })
 };
 
 // Attendance API
 export const attendanceAPI = {
-  getAll: async () => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [
-      { _id: '1', beneficiary_id: 'BEN001', date: new Date().toISOString().split('T')[0], status: 'present' }
-    ];
-  },
-  
-  create: async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { message: 'Attendance record created successfully', attendance: { ...data, _id: Date.now().toString() } };
-  },
-  
-  getByBeneficiary: async (beneficiaryId) => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [{ _id: '1', beneficiary_id: beneficiaryId, date: new Date().toISOString().split('T')[0], status: 'present' }];
-  },
-  
-  getByDate: async (date) => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [{ _id: '1', beneficiary_id: 'BEN001', date: date, status: 'present' }];
-  }
+  getAll: () => request('/attendance'),
+  create: (data) => request('/attendance', { method: 'POST', body: JSON.stringify(data) }),
+  getByBeneficiary: (id) => request(`/attendance/beneficiary/${id}`),
+  getByDate: (date) => request(`/attendance/date/${date}`),
+  delete: (id) => request(`/attendance/${id}`, { method: 'DELETE' })
 };
 
 // Nutrition API
 export const nutritionAPI = {
-  getAll: async () => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [
-      { _id: '1', beneficiary_id: 'BEN001', nutrition_status: 'normal', meals: 'Balanced diet', recommendations: 'Continue current diet', date: '2024-01-15' }
-    ];
-  },
-  
-  create: async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { message: 'Nutrition record created successfully', nutritionRecord: { ...data, _id: Date.now().toString() } };
-  }
+  getAll: () => request('/nutrition'),
+  create: (data) => request('/nutrition', { method: 'POST', body: JSON.stringify(data) }),
+  getByBeneficiary: (id) => request(`/nutrition/beneficiary/${id}`),
+  delete: (id) => request(`/nutrition/${id}`, { method: 'DELETE' })
 };
 
 // Vaccination API
 export const vaccinationAPI = {
-  getAll: async () => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [
-      { _id: '1', beneficiary_id: 'BEN001', vaccine: 'BCG', date: '2023-01-20', next_due_date: '2023-08-20' }
-    ];
-  },
-  
-  create: async (data) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { message: 'Vaccination record created successfully', vaccination: { ...data, _id: Date.now().toString() } };
-  },
-  
-  getByBeneficiary: async (beneficiaryId) => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [{ _id: '1', beneficiary_id: beneficiaryId, vaccine: 'BCG', date: '2023-01-20', next_due_date: '2023-08-20' }];
-  }
+  getAll: () => request('/vaccination'),
+  create: (data) => request('/vaccination', { method: 'POST', body: JSON.stringify(data) }),
+  getByBeneficiary: (id) => request(`/vaccination/beneficiary/${id}`),
+  getDue: () => request('/vaccination/due/all'),
+  getPending: () => request('/vaccination/pending/all'),
+  markCompleted: (id) => request(`/vaccination/${id}/complete`, { method: 'PATCH' }),
+  markIncomplete: (id) => request(`/vaccination/${id}/undo-complete`, { method: 'PATCH' }),
+  delete: (id) => request(`/vaccination/${id}`, { method: 'DELETE' })
 };
 
 // Report API
 export const reportAPI = {
   generate: async (reportType, dateRange) => {
     await new Promise(resolve => setTimeout(resolve, 500));
-    return { 
-      reportType, 
-      data: [{ _id: '1', name: 'Sample Data' }], 
-      count: 1, 
-      generatedAt: new Date() 
+    return {
+      reportType,
+      data: [{ _id: '1', name: 'Sample Data' }],
+      count: 1,
+      generatedAt: new Date()
     };
   },
-  
-  getAlerts: async () => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [
-      { type: 'health', severity: 'high', message: '2 children showing growth risks', count: 2 },
-      { type: 'vaccination', severity: 'medium', message: '5 vaccinations due this week', count: 5 }
-    ];
-  }
+  getAlerts: () => request('/reports/alerts'),
+  getAlertDetails: (type) => request(`/reports/alerts/${type}`)
 };
 
 // OCR API

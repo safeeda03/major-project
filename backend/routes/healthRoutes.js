@@ -9,11 +9,14 @@ const {
   getHealthRecordsByBeneficiary
 } = require('../controllers/healthController');
 
-// Get all health records
-router.get('/', getAllHealthRecords);
+// Get health records by beneficiary
+router.get('/beneficiary/:beneficiaryId', getHealthRecordsByBeneficiary);
 
 // Get health record by ID
 router.get('/:id', getHealthRecordById);
+
+// Get all health records
+router.get('/', getAllHealthRecords);
 
 // Create new health record
 router.post('/', createHealthRecord);
@@ -23,8 +26,5 @@ router.put('/:id', updateHealthRecord);
 
 // Delete health record
 router.delete('/:id', deleteHealthRecord);
-
-// Get health records by beneficiary
-router.get('/beneficiary/:beneficiaryId', getHealthRecordsByBeneficiary);
 
 module.exports = router;

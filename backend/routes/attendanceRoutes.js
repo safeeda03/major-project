@@ -10,11 +10,17 @@ const {
   getAttendanceByDate
 } = require('../controllers/attendanceController');
 
-// Get all attendance records
-router.get('/', getAllAttendance);
+// Get attendance by beneficiary
+router.get('/beneficiary/:beneficiaryId', getAttendanceByBeneficiary);
+
+// Get attendance by date
+router.get('/date/:date', getAttendanceByDate);
 
 // Get attendance record by ID
 router.get('/:id', getAttendanceById);
+
+// Get all attendance records
+router.get('/', getAllAttendance);
 
 // Create new attendance record
 router.post('/', createAttendance);
@@ -24,11 +30,5 @@ router.put('/:id', updateAttendance);
 
 // Delete attendance record
 router.delete('/:id', deleteAttendance);
-
-// Get attendance by beneficiary
-router.get('/beneficiary/:beneficiaryId', getAttendanceByBeneficiary);
-
-// Get attendance by date
-router.get('/date/:date', getAttendanceByDate);
 
 module.exports = router;

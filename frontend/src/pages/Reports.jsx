@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import { reportAPI } from '../services/api';
@@ -32,7 +33,7 @@ const Reports = () => {
   const loadAlerts = async () => {
     try {
       const response = await reportAPI.getAlerts();
-      setAlerts(response.alerts || []);
+      setAlerts(Array.isArray(response) ? response : response.alerts || []);
     } catch (err) {
       console.error('Failed to load alerts:', err);
     }
@@ -89,15 +90,12 @@ const Reports = () => {
             <div className="alerts-section">
               <h3>Alerts</h3>
               <div className="alert-list">
-                <div className="alert-item alert-high">
-                  <strong>Growth/Health Risk:</strong> 5 children showing stunted growth
-                </div>
-                <div className="alert-item alert-medium">
-                  <strong>Vaccination Due:</strong> 12 children due for vaccination this week
-                </div>
-                <div className="alert-item alert-low">
-                  <strong>Low Attendance:</strong> 3 centres below 80% attendance rate
-                </div>
+                {alerts.length ? alerts.map((alert) => (
+                  <Link key={alert.type} to={`/reports/alerts/${alert.type}`} className={`alert-item alert-${alert.severity} alert-link`}>
+                    <strong>{alert.type === 'health' ? 'Growth/Health Risk' : alert.type === 'vaccination' ? 'Vaccination Due' : alert.type === 'nutrition' ? 'Nutrition Risk' : 'Low Attendance'}:</strong> {alert.message}
+                    <span className="alert-view-link">View students →</span>
+                  </Link>
+                )) : <p>No current alerts based on the saved records.</p>}
               </div>
             </div>
           </div>

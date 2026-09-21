@@ -101,7 +101,7 @@ export const BarChart = ({ data, labels, title }) => {
   );
 };
 
-export const LineChart = ({ data, labels, title }) => {
+export const LineChart = ({ data, labels, title, maxValue }) => {
   const chartData = {
     labels: labels || [],
     datasets: [{
@@ -128,6 +128,7 @@ export const LineChart = ({ data, labels, title }) => {
     scales: {
       y: {
         beginAtZero: true,
+        ...(maxValue !== undefined ? { max: maxValue } : {}),
       },
     },
   };

@@ -16,6 +16,10 @@ const vaccinationSchema = new mongoose.Schema({
   next_due_date: {
     type: Date
   },
+  completed: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

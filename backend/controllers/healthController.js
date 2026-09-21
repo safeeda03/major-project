@@ -1,5 +1,21 @@
 const HealthRecord = require('../models/HealthRecord');
 
+const getDayRange = (date) => {
+  const start = new Date(`${date}T00:00:00.000Z`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  return { start, end };
+};
+
+const calculateHealthValues = (height, weight) => {
+  const heightInMeters = height / 100;
+  const bmi = Number((weight / (heightInMeters * heightInMeters)).toFixed(2));
+  let health_status = 'normal';
+  if (bmi < 18.5) health_status = 'underweight';
+  else if (bmi >= 25) health_status = 'overweight';
+  return { bmi, health_status };
+};
+
 // Get all health records
 exports.getAllHealthRecords = async (req, res) => {
   try {
@@ -28,28 +44,38 @@ exports.createHealthRecord = async (req, res) => {
   try {
     const { beneficiary_id, height, weight, date } = req.body;
 
-    // Calculate BMI
-    const heightInMeters = height / 100;
-    const bmi = (weight / (heightInMeters * heightInMeters)).toFixed(2);
+    const { start, end } = getDayRange(date);
+    if (Number.isNaN(start.getTime())) {
+      return res.status(400).json({ message: 'A valid measurement date is required' });
+    }
 
-    // Determine health status based on BMI and other factors
-    let health_status = 'normal';
-    if (bmi < 18.5) health_status = 'underweight';
-    else if (bmi >= 25) health_status = 'overweight';
-
-    const healthRecord = new HealthRecord({
+    const { bmi, health_status } = calculateHealthValues(height, weight);
+    const matchingRecords = await HealthRecord.find({
       beneficiary_id,
-      height,
-      weight,
-      bmi,
-      health_status,
-      date
-    });
+      date: { $gte: start, $lt: end }
+    }).sort({ createdAt: 1 });
 
-    await healthRecord.save();
+    const recordData = { beneficiary_id, height, weight, bmi, health_status, date };
+    let healthRecord;
+    let updated = false;
 
-    res.status(201).json({
-      message: 'Health record created successfully',
+    if (matchingRecords.length) {
+      healthRecord = await HealthRecord.findByIdAndUpdate(
+        matchingRecords[0]._id,
+        recordData,
+        { new: true, runValidators: true }
+      );
+      updated = true;
+
+      // Remove duplicates left by older saves for the same child and date.
+      const duplicateIds = matchingRecords.slice(1).map((record) => record._id);
+      if (duplicateIds.length) await HealthRecord.deleteMany({ _id: { $in: duplicateIds } });
+    } else {
+      healthRecord = await HealthRecord.create(recordData);
+    }
+
+    res.status(updated ? 200 : 201).json({
+      message: updated ? 'Health record updated successfully' : 'Health record created successfully',
       healthRecord
     });
   } catch (error) {
@@ -65,12 +91,7 @@ exports.updateHealthRecord = async (req, res) => {
     // Recalculate BMI if height or weight is updated
     let updateData = { beneficiary_id, date };
     if (height && weight) {
-      const heightInMeters = height / 100;
-      const bmi = (weight / (heightInMeters * heightInMeters)).toFixed(2);
-      let health_status = 'normal';
-      if (bmi < 18.5) health_status = 'underweight';
-      else if (bmi >= 25) health_status = 'overweight';
-      
+      const { bmi, health_status } = calculateHealthValues(height, weight);
       updateData = { ...updateData, height, weight, bmi, health_status };
     }
 
@@ -111,7 +132,16 @@ exports.deleteHealthRecord = async (req, res) => {
 // Get health records by beneficiary
 exports.getHealthRecordsByBeneficiary = async (req, res) => {
   try {
-    const healthRecords = await HealthRecord.find({ beneficiary_id: req.params.beneficiaryId });
+    const records = await HealthRecord.find({ beneficiary_id: req.params.beneficiaryId })
+      .sort({ date: -1, createdAt: -1 });
+    // For historic duplicate rows, show only the newest value for each date.
+    const dateKeys = new Set();
+    const healthRecords = records.filter((record) => {
+      const dateKey = record.date.toISOString().slice(0, 10);
+      if (dateKeys.has(dateKey)) return false;
+      dateKeys.add(dateKey);
+      return true;
+    });
     res.json(healthRecords);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
