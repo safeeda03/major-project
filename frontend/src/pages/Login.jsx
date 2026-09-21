@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
 
@@ -12,7 +12,8 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { login, user } = useAuth();
+  const location = useLocation();
+  const { login } = useAuth();
 
   const handleChange = (e) => {
     setFormData({
@@ -52,6 +53,7 @@ const Login = () => {
       <div className="login-container">
         <div className="login-box">
           <h2>PoshanAI Login</h2>
+          {location.state?.message && <div className="success-message login-status-message" role="status">{location.state.message}</div>}
           <form onSubmit={handleSubmit}>
             <div className="form-group">
               <label>Phone Number</label>

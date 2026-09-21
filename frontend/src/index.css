@@ -815,6 +815,10 @@ body {
   border-left: 4px solid #27ae60;
 }
 
+.login-status-message {
+  margin-bottom: 1rem;
+}
+
 /* OCR Result Styles */
 .ocr-result {
   background: white;

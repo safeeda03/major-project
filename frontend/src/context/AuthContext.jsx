@@ -38,17 +38,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = async () => {
-    try {
-      await authAPI.logout();
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      setToken(null);
-      setUser(null);
-    }
+  const logout = () => {
+    // Clear the local session first so logout succeeds even when the server is unavailable.
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setToken(null);
+    setUser(null);
+
+    authAPI.logout().catch((error) => {
+      console.error('Logout notification failed:', error);
+    });
   };
 
   const isAuthenticated = () => {

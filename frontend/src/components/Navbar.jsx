@@ -8,7 +8,7 @@ const Navbar = () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate('/login', { replace: true, state: { message: 'Logged out successfully.' } });
   };
 
   const getDashboardPath = () => {
@@ -22,7 +22,7 @@ const Navbar = () => {
       <div className="navbar-brand">
         <h1>PoshanAI</h1>
       </div>
-      <div className="navbar-menu">
+      {user && <div className="navbar-menu">
         <a href={getDashboardPath()}>Dashboard</a>
         {hasRole(['worker', 'admin']) && <a href="/beneficiaries">Beneficiaries</a>}
         {hasRole(['worker', 'supervisor', 'admin']) && <a href="/reports">Reports</a>}
@@ -30,7 +30,7 @@ const Navbar = () => {
         {hasRole(['supervisor', 'admin']) && <a href="/map">GIS Map</a>}
         <span className="user-info">Welcome, {user?.name || 'User'}</span>
         <button onClick={handleLogout} className="logout-btn">Logout</button>
-      </div>
+      </div>}
     </nav>
   );
 };
