@@ -34,7 +34,7 @@ const Login = () => {
         worker: '/worker-dashboard',
         supervisor: '/supervisor-dashboard',
         parent: '/parent-dashboard',
-        admin: '/worker-dashboard'
+        admin: '/supervisor-dashboard'
       };
       
       // Use the user role from login response

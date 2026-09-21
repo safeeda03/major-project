@@ -108,8 +108,11 @@ const BeneficiaryDetails = () => {
               <div><span>Beneficiary ID</span><strong>{data.beneficiary.beneficiary_id}</strong></div>
               <div><span>Date of Birth</span><strong>{formatDate(data.beneficiary.dob)}</strong></div>
               <div><span>Gender</span><strong>{data.beneficiary.gender}</strong></div>
+              <div><span>Beneficiary type</span><strong>{{ child: 'Child', pregnant_woman: 'Pregnant woman', lactating_mother: 'Lactating mother' }[data.beneficiary.beneficiary_type] || 'Child'}</strong></div>
               <div><span>Centre ID</span><strong>{data.beneficiary.anganwadi_id}</strong></div>
+              {data.beneficiary.contact_phone && <div><span>Contact phone</span><strong>{data.beneficiary.contact_phone}</strong></div>}
             </div>
+            {data.beneficiary.notes && <div className="form-container records-container"><h3>Notes / observations</h3><p>{data.beneficiary.notes}</p></div>}
 
             <RecordTable title="Health Records" headers={['Date', 'Height', 'Weight', 'BMI', 'Status']} rows={data.healthRecords.map((record) => [formatDate(record.date), `${record.height} cm`, `${record.weight} kg`, record.bmi, record.health_status])} />
             <RecordTable title="Nutrition Records" headers={['Date', 'Status', 'Meals', 'Recommendations']} rows={data.nutritionRecords.map((record) => [formatDate(record.date), record.nutrition_status, record.meals || '—', record.recommendations || '—'])} />

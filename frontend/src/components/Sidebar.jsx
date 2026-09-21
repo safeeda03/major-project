@@ -1,6 +1,8 @@
 import React from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ role }) => {
+  const { user } = useAuth();
   const menuItems = {
     worker: [
       { name: 'Dashboard', path: '/worker-dashboard' },
@@ -31,7 +33,8 @@ const Sidebar = ({ role }) => {
     ]
   };
 
-  const items = menuItems[role] || menuItems.worker;
+  const activeRole = user?.role === 'admin' ? 'supervisor' : (user?.role || role || 'worker');
+  const items = menuItems[activeRole] || menuItems.worker;
 
   return (
     <div className="sidebar">

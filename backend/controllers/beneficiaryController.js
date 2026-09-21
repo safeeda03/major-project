@@ -30,7 +30,7 @@ exports.getBeneficiaryById = async (req, res) => {
 // Create new beneficiary
 exports.createBeneficiary = async (req, res) => {
   try {
-    const { name, dob, gender, parent_id, anganwadi_id } = req.body;
+    const { name, dob, gender, parent_id, anganwadi_id, beneficiary_type, contact_phone, notes } = req.body;
 
     // Continue the human-readable IDs used by the seeded data: BEN001, BEN002, ...
     const existingIds = await Beneficiary.find({ beneficiary_id: /^BEN\d+$/ })
@@ -48,7 +48,10 @@ exports.createBeneficiary = async (req, res) => {
       dob,
       gender,
       parent_id,
-      anganwadi_id
+      anganwadi_id,
+      beneficiary_type: beneficiary_type || 'child',
+      contact_phone,
+      notes
     });
 
     await beneficiary.save();
@@ -65,11 +68,11 @@ exports.createBeneficiary = async (req, res) => {
 // Update beneficiary
 exports.updateBeneficiary = async (req, res) => {
   try {
-    const { name, dob, gender, parent_id, anganwadi_id } = req.body;
+    const { name, dob, gender, parent_id, anganwadi_id, beneficiary_type, contact_phone, notes } = req.body;
 
     const beneficiary = await Beneficiary.findByIdAndUpdate(
       req.params.id,
-      { name, dob, gender, parent_id, anganwadi_id },
+      { name, dob, gender, parent_id, anganwadi_id, beneficiary_type: beneficiary_type || 'child', contact_phone, notes },
       { new: true, runValidators: true }
     );
 

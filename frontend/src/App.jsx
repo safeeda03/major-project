@@ -12,6 +12,7 @@ import Vaccination from './pages/Vaccination';
 import Attendance from './pages/Attendance';
 import Reports from './pages/Reports';
 import AlertDetails from './pages/AlertDetails';
+import Alerts from './pages/Alerts';
 import Chatbot from './pages/Chatbot';
 import Map from './pages/Map';
 import OCR from './pages/OCR';
@@ -72,6 +73,11 @@ function App() {
           <Route path="/reports" element={
             <ProtectedRoute allowedRoles={['worker', 'supervisor', 'admin']}>
               <Reports />
+            </ProtectedRoute>
+          } />
+          <Route path="/alerts" element={
+            <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+              <Alerts />
             </ProtectedRoute>
           } />
           <Route path="/reports/alerts/:type" element={

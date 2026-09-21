@@ -20,6 +20,13 @@ const beneficiarySchema = new mongoose.Schema({
     enum: ['male', 'female'],
     required: true
   },
+  beneficiary_type: {
+    type: String,
+    enum: ['child', 'pregnant_woman', 'lactating_mother'],
+    default: 'child'
+  },
+  contact_phone: String,
+  notes: String,
   parent_id: {
     type: String,
     required: true

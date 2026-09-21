@@ -12,7 +12,7 @@ const Navbar = () => {
   };
 
   const getDashboardPath = () => {
-    if (hasRole('supervisor')) return '/supervisor-dashboard';
+    if (hasRole(['supervisor', 'admin'])) return '/supervisor-dashboard';
     if (hasRole('parent')) return '/parent-dashboard';
     return '/worker-dashboard';
   };

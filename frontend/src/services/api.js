@@ -60,6 +60,7 @@ export const healthAPI = {
   getAll: () => request('/health'),
   create: (data) => request('/health', { method: 'POST', body: JSON.stringify(data) }),
   getByBeneficiary: (id) => request(`/health/beneficiary/${id}`),
+  update: (id, data) => request(`/health/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id) => request(`/health/${id}`, { method: 'DELETE' })
 };
 
@@ -69,6 +70,7 @@ export const attendanceAPI = {
   create: (data) => request('/attendance', { method: 'POST', body: JSON.stringify(data) }),
   getByBeneficiary: (id) => request(`/attendance/beneficiary/${id}`),
   getByDate: (date) => request(`/attendance/date/${date}`),
+  update: (id, data) => request(`/attendance/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id) => request(`/attendance/${id}`, { method: 'DELETE' })
 };
 
@@ -77,6 +79,7 @@ export const nutritionAPI = {
   getAll: () => request('/nutrition'),
   create: (data) => request('/nutrition', { method: 'POST', body: JSON.stringify(data) }),
   getByBeneficiary: (id) => request(`/nutrition/beneficiary/${id}`),
+  update: (id, data) => request(`/nutrition/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id) => request(`/nutrition/${id}`, { method: 'DELETE' })
 };
 
@@ -84,6 +87,7 @@ export const nutritionAPI = {
 export const vaccinationAPI = {
   getAll: () => request('/vaccination'),
   create: (data) => request('/vaccination', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/vaccination/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   getByBeneficiary: (id) => request(`/vaccination/beneficiary/${id}`),
   getDue: () => request('/vaccination/due/all'),
   getPending: () => request('/vaccination/pending/all'),
