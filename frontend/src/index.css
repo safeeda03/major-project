@@ -699,6 +699,51 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.report-document {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-top: 1.5rem;
+  padding: 2rem;
+}
+
+.report-document-header {
+  align-items: flex-start;
+  border-bottom: 2px solid #1976b9;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+}
+
+.report-document-header h2,
+.report-document-header h3,
+.report-document-header p {
+  margin: 0 0 0.4rem;
+}
+
+.print-btn {
+  background: #1976b9;
+  border: 0;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  padding: 0.6rem 0.9rem;
+}
+
+@media print {
+  .page > :not(.page-content),
+  .page-content > :not(.main-content),
+  .main-content > :not(.report-document),
+  .print-btn { display: none !important; }
+
+  .report-document {
+    box-shadow: none;
+    margin: 0;
+    padding: 0;
+  }
+}
+
 /* Beneficiary Card */
 .beneficiary-card {
   background: white;

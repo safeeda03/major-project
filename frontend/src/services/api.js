@@ -98,15 +98,10 @@ export const vaccinationAPI = {
 
 // Report API
 export const reportAPI = {
-  generate: async (reportType, dateRange) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return {
-      reportType,
-      data: [{ _id: '1', name: 'Sample Data' }],
-      count: 1,
-      generatedAt: new Date()
-    };
-  },
+  generate: (reportType, dateRange) => request('/reports/generate', {
+    method: 'POST',
+    body: JSON.stringify({ reportType, ...dateRange })
+  }),
   getAlerts: () => request('/reports/alerts'),
   getAlertDetails: (type) => request(`/reports/alerts/${type}`)
 };

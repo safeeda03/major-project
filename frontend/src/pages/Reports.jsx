@@ -4,6 +4,38 @@ import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import { reportAPI } from '../services/api';
 
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '—');
+
+const reportLabels = {
+  beneficiary: 'Beneficiary Report',
+  health: 'Health Report',
+  nutrition: 'Nutrition Report',
+  vaccination: 'Vaccination Report',
+  attendance: 'Attendance Report',
+  centre: 'Centre Report'
+};
+
+const reportColumns = {
+  beneficiary: ['Beneficiary ID', 'Name', 'Date of Birth', 'Gender', 'Centre'],
+  health: ['Beneficiary ID', 'Date', 'Height', 'Weight', 'BMI', 'Status'],
+  nutrition: ['Beneficiary ID', 'Date', 'Status', 'Meals', 'Recommendations'],
+  vaccination: ['Beneficiary ID', 'Vaccine', 'Given on', 'Next due', 'Status'],
+  attendance: ['Beneficiary ID', 'Date', 'Attendance'],
+  centre: ['Centre ID', 'Registered Beneficiaries']
+};
+
+const reportRow = (type, record) => {
+  switch (type) {
+    case 'beneficiary': return [record.beneficiary_id, record.name, formatDate(record.dob), record.gender, record.anganwadi_id];
+    case 'health': return [record.beneficiary_id, formatDate(record.date), `${record.height} cm`, `${record.weight} kg`, record.bmi, record.health_status];
+    case 'nutrition': return [record.beneficiary_id, formatDate(record.date), record.nutrition_status, record.meals || '—', record.recommendations || '—'];
+    case 'vaccination': return [record.beneficiary_id, record.vaccine, formatDate(record.date), formatDate(record.next_due_date), record.completed ? 'Completed' : 'Pending'];
+    case 'attendance': return [record.beneficiary_id, formatDate(record.date), record.status];
+    case 'centre': return [record.centre_id, record.beneficiaryCount];
+    default: return [];
+  }
+};
+
 const Reports = () => {
   const [reportType, setReportType] = useState('beneficiary');
   const [dateRange, setDateRange] = useState({
@@ -14,14 +46,17 @@ const Reports = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [alerts, setAlerts] = useState([]);
+  const [report, setReport] = useState(null);
 
   const handleGenerateReport = async () => {
     setLoading(true);
     setError('');
     setMessage('');
+    setReport(null);
 
     try {
       const response = await reportAPI.generate(reportType, dateRange);
+      setReport(response);
       setMessage('Report generated successfully!');
     } catch (err) {
       setError(err.message || 'Failed to generate report');
@@ -99,6 +134,21 @@ const Reports = () => {
               </div>
             </div>
           </div>
+          {report && <section className="report-document">
+            <div className="report-document-header">
+              <div>
+                <h2>PoshanAI</h2>
+                <h3>{reportLabels[report.reportType]}</h3>
+                <p>Generated: {formatDate(report.generatedAt)} · {report.count} record{report.count === 1 ? '' : 's'}</p>
+                {(dateRange.startDate || dateRange.endDate) && <p>Period: {dateRange.startDate ? formatDate(dateRange.startDate) : 'Beginning'} to {dateRange.endDate ? formatDate(dateRange.endDate) : 'Today'}</p>}
+              </div>
+              <button type="button" className="print-btn" onClick={() => window.print()}>Print / Save PDF</button>
+            </div>
+            {report.data.length ? <div className="records-table-wrapper"><table className="records-table report-table">
+              <thead><tr>{reportColumns[report.reportType].map((column) => <th key={column}>{column}</th>)}</tr></thead>
+              <tbody>{report.data.map((record, index) => <tr key={record._id || `${record.centre_id}-${index}`}>{reportRow(report.reportType, record).map((value, columnIndex) => <td key={columnIndex}>{value}</td>)}</tr>)}</tbody>
+            </table></div> : <p>No records found for this report and date range.</p>}
+          </section>}
         </main>
       </div>
     </div>

@@ -24,8 +24,10 @@ exports.generateReport = async (req, res) => {
 
     let data = [];
     const dateFilter = {};
-    if (startDate && endDate) {
-      dateFilter.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
+    if (startDate || endDate) {
+      dateFilter.date = {};
+      if (startDate) dateFilter.date.$gte = new Date(`${startDate}T00:00:00.000Z`);
+      if (endDate) dateFilter.date.$lte = new Date(`${endDate}T23:59:59.999Z`);
     }
 
     switch (reportType) {
@@ -41,6 +43,25 @@ exports.generateReport = async (req, res) => {
       case 'vaccination':
         data = await Vaccination.find(dateFilter);
         break;
+      case 'attendance':
+        data = await Attendance.find(dateFilter);
+        break;
+      case 'centre': {
+        const beneficiaryFilter = {};
+        if (startDate || endDate) {
+          beneficiaryFilter.createdAt = {};
+          if (startDate) beneficiaryFilter.createdAt.$gte = new Date(`${startDate}T00:00:00.000Z`);
+          if (endDate) beneficiaryFilter.createdAt.$lte = new Date(`${endDate}T23:59:59.999Z`);
+        }
+        const beneficiaries = await Beneficiary.find(beneficiaryFilter);
+        const centres = beneficiaries.reduce((summary, beneficiary) => {
+          const centreId = beneficiary.anganwadi_id || 'Not assigned';
+          summary.set(centreId, (summary.get(centreId) || 0) + 1);
+          return summary;
+        }, new Map());
+        data = [...centres.entries()].map(([centre_id, beneficiaryCount]) => ({ centre_id, beneficiaryCount }));
+        break;
+      }
       default:
         return res.status(400).json({ message: 'Invalid report type' });
     }
