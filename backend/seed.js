@@ -107,7 +107,7 @@ const seedData = async () => {
         name: 'Rahul Kumar',
         dob: new Date('2023-01-15'),
         gender: 'male',
-        parent_id: 'USR003',
+        parent_id: 'USR010',
         anganwadi_id: 'ANG001'
       },
       {
@@ -115,7 +115,7 @@ const seedData = async () => {
         name: 'Priya Singh',
         dob: new Date('2022-06-20'),
         gender: 'female',
-        parent_id: 'USR003',
+        parent_id: 'USR011',
         anganwadi_id: 'ANG001'
       },
       {
@@ -123,7 +123,7 @@ const seedData = async () => {
         name: 'Amit Verma',
         dob: new Date('2021-11-10'),
         gender: 'male',
-        parent_id: 'USR003',
+        parent_id: 'USR012',
         anganwadi_id: 'ANG002'
       },
       {
@@ -131,7 +131,7 @@ const seedData = async () => {
         name: 'Sneha Gupta',
         dob: new Date('2020-03-25'),
         gender: 'female',
-        parent_id: 'USR003',
+        parent_id: 'USR013',
         anganwadi_id: 'ANG002'
       },
       {

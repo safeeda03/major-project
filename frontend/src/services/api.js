@@ -2,12 +2,17 @@
 const API_BASE_URL = '/api';
 
 const request = async (path, options = {}) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      ...options,
+    });
+  } catch {
+    throw new Error('Cannot reach the backend server. Start it with “npm run dev” inside the backend folder.');
+  }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Request failed');
+  if (!response.ok) throw new Error(data.message || `The backend request failed (HTTP ${response.status}). Start the backend server and try again.`);
   return data;
 };
 
@@ -49,6 +54,7 @@ export const authAPI = {
 // Beneficiary API
 export const beneficiaryAPI = {
   getAll: () => request('/beneficiaries'),
+  getByParent: (parentId) => request(`/beneficiaries/parent/${parentId}`),
   getById: (id) => request(`/beneficiaries/${id}`),
   create: (data) => request('/beneficiaries', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/beneficiaries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -98,10 +104,11 @@ export const vaccinationAPI = {
 
 // Report API
 export const reportAPI = {
-  generate: (reportType, dateRange) => request('/reports/generate', {
+  generate: (reportType, dateRange, beneficiaryCategory) => request('/reports/generate', {
     method: 'POST',
-    body: JSON.stringify({ reportType, ...dateRange })
+    body: JSON.stringify({ reportType, ...dateRange, beneficiaryCategory })
   }),
+  getCentreStatistics: () => request('/reports/statistics/centres'),
   getAlerts: () => request('/reports/alerts'),
   getAlertDetails: (type) => request(`/reports/alerts/${type}`)
 };
@@ -161,14 +168,9 @@ export const chatbotAPI = {
 
 // GIS API
 export const gisAPI = {
-  getCentres: async () => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [
-      { _id: '1', centre_id: 'ANG001', name: 'Anganwadi Centre A', latitude: 28.6139, longitude: 77.2090, address: 'Sector 1, New Delhi' },
-      { _id: '2', centre_id: 'ANG002', name: 'Anganwadi Centre B', latitude: 28.6150, longitude: 77.2100, address: 'Sector 2, New Delhi' },
-      { _id: '3', centre_id: 'ANG003', name: 'Anganwadi Centre C', latitude: 28.6170, longitude: 77.2080, address: 'Sector 3, New Delhi' }
-    ];
-  },
+  getCentres: () => request('/gis/centres'),
+  createCentre: (data) => request('/gis/centres', { method: 'POST', body: JSON.stringify(data) }),
+  updateCentre: (id, data) => request(`/gis/centres/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   
   getClustering: async () => {
     await new Promise(resolve => setTimeout(resolve, 300));

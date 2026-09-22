@@ -14,6 +14,20 @@ exports.getAllBeneficiaries = async (req, res) => {
   }
 };
 
+// Get the child currently linked to a parent account. The current parent flow
+// supports one child per parent; this can be expanded to multiple later.
+exports.getBeneficiaryByParent = async (req, res) => {
+  try {
+    const beneficiary = await Beneficiary.findOne({
+      parent_id: req.params.parentId,
+      beneficiary_type: 'child'
+    }).sort({ createdAt: 1 });
+    res.json(beneficiary ? [beneficiary] : []);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 // Get beneficiary by ID
 exports.getBeneficiaryById = async (req, res) => {
   try {
@@ -30,7 +44,15 @@ exports.getBeneficiaryById = async (req, res) => {
 // Create new beneficiary
 exports.createBeneficiary = async (req, res) => {
   try {
-    const { name, dob, gender, parent_id, anganwadi_id, beneficiary_type, contact_phone, notes } = req.body;
+    const { name, dob, gender, parent_id, anganwadi_id, beneficiary_type, contact_phone, notes, profile_photo } = req.body;
+    const type = beneficiary_type || 'child';
+
+    if (type === 'child') {
+      const linkedChild = await Beneficiary.findOne({ parent_id, beneficiary_type: 'child' });
+      if (linkedChild) {
+        return res.status(409).json({ message: 'This parent account already has a linked child profile.' });
+      }
+    }
 
     // Continue the human-readable IDs used by the seeded data: BEN001, BEN002, ...
     const existingIds = await Beneficiary.find({ beneficiary_id: /^BEN\d+$/ })
@@ -49,9 +71,10 @@ exports.createBeneficiary = async (req, res) => {
       gender,
       parent_id,
       anganwadi_id,
-      beneficiary_type: beneficiary_type || 'child',
+      beneficiary_type: type,
       contact_phone,
-      notes
+      notes,
+      profile_photo
     });
 
     await beneficiary.save();
@@ -68,11 +91,11 @@ exports.createBeneficiary = async (req, res) => {
 // Update beneficiary
 exports.updateBeneficiary = async (req, res) => {
   try {
-    const { name, dob, gender, parent_id, anganwadi_id, beneficiary_type, contact_phone, notes } = req.body;
+    const { name, dob, gender, parent_id, anganwadi_id, beneficiary_type, contact_phone, notes, profile_photo } = req.body;
 
     const beneficiary = await Beneficiary.findByIdAndUpdate(
       req.params.id,
-      { name, dob, gender, parent_id, anganwadi_id, beneficiary_type: beneficiary_type || 'child', contact_phone, notes },
+      { name, dob, gender, parent_id, anganwadi_id, beneficiary_type: beneficiary_type || 'child', contact_phone, notes, profile_photo },
       { new: true, runValidators: true }
     );
 

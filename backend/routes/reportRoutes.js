@@ -1,9 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { generateReport, getAlerts, getAlertDetails } = require('../controllers/reportController');
+const { generateReport, getAlerts, getAlertDetails, getCentreStatistics } = require('../controllers/reportController');
 
 // Generate report
 router.post('/generate', generateReport);
+
+// Per-Anganwadi operational statistics
+router.get('/statistics/centres', getCentreStatistics);
 
 // Get alerts
 router.get('/alerts', getAlerts);

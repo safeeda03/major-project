@@ -6,11 +6,15 @@ const {
   createBeneficiary,
   updateBeneficiary,
   deleteBeneficiary,
-  getBeneficiariesByCentre
+  getBeneficiariesByCentre,
+  getBeneficiaryByParent
 } = require('../controllers/beneficiaryController');
 
 // Get beneficiaries by anganwadi centre
 router.get('/centre/:centreId', getBeneficiariesByCentre);
+
+// Get the child linked to a parent account (must be before /:id).
+router.get('/parent/:parentId', getBeneficiaryByParent);
 
 // Get beneficiary by ID
 router.get('/:id', getBeneficiaryById);

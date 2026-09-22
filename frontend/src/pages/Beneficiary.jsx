@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar';
 import { beneficiaryAPI } from '../services/api';
 
 const blank = () => ({ name: '', dob: '', gender: '', beneficiary_type: 'child', parent_id: '', anganwadi_id: '', contact_phone: '', notes: '' });
-const labels = { child: 'Child', pregnant_woman: 'Pregnant woman', lactating_mother: 'Lactating mother' };
+const labels = { child: 'Child', pregnant_woman: 'Pregnant woman', lactating_mother: 'Lactating mother', elderly_person: 'Elderly person' };
 
 export default function Beneficiary() {
   const [form, setForm] = useState(blank());
@@ -30,7 +30,7 @@ export default function Beneficiary() {
   return <div className="page"><Navbar /><div className="page-content"><Sidebar role="worker" /><main className="main-content">
     <h2>Beneficiary Management</h2>
     <div className="form-container"><h3>{editing ? 'Update Beneficiary' : 'Register Beneficiary'}</h3><form onSubmit={submit}>
-      <Field label="Beneficiary type"><select name="beneficiary_type" value={form.beneficiary_type} onChange={change}><option value="child">Child</option><option value="pregnant_woman">Pregnant woman</option><option value="lactating_mother">Lactating mother</option></select></Field>
+      <Field label="Beneficiary type"><select name="beneficiary_type" value={form.beneficiary_type} onChange={change}><option value="child">Child</option><option value="pregnant_woman">Pregnant woman</option><option value="lactating_mother">Lactating mother</option><option value="elderly_person">Elderly person</option></select></Field>
       <Field label="Full name"><input name="name" value={form.name} onChange={change} required /></Field><Field label="Date of birth"><input type="date" name="dob" value={form.dob} onChange={change} required /></Field>
       <Field label="Gender"><select name="gender" value={form.gender} onChange={change} required><option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option></select></Field>
       <Field label="Parent/guardian ID"><input name="parent_id" value={form.parent_id} onChange={change} required /></Field><Field label="Anganwadi centre ID"><input name="anganwadi_id" value={form.anganwadi_id} onChange={change} required /></Field>

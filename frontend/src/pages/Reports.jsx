@@ -16,7 +16,7 @@ const reportLabels = {
 };
 
 const reportColumns = {
-  beneficiary: ['Beneficiary ID', 'Name', 'Date of Birth', 'Gender', 'Centre'],
+  beneficiary: ['Beneficiary ID', 'Name', 'Category', 'Date of Birth', 'Gender', 'Centre'],
   health: ['Beneficiary ID', 'Date', 'Height', 'Weight', 'BMI', 'Status'],
   nutrition: ['Beneficiary ID', 'Date', 'Status', 'Meals', 'Recommendations'],
   vaccination: ['Beneficiary ID', 'Vaccine', 'Given on', 'Next due', 'Status'],
@@ -26,7 +26,7 @@ const reportColumns = {
 
 const reportRow = (type, record) => {
   switch (type) {
-    case 'beneficiary': return [record.beneficiary_id, record.name, formatDate(record.dob), record.gender, record.anganwadi_id];
+    case 'beneficiary': return [record.beneficiary_id, record.name, { child: 'Child', pregnant_woman: 'Pregnant woman', lactating_mother: 'Lactating mother', elderly_person: 'Elderly person' }[record.beneficiary_type] || 'Child', formatDate(record.dob), record.gender, record.anganwadi_id];
     case 'health': return [record.beneficiary_id, formatDate(record.date), `${record.height} cm`, `${record.weight} kg`, record.bmi, record.health_status];
     case 'nutrition': return [record.beneficiary_id, formatDate(record.date), record.nutrition_status, record.meals || '—', record.recommendations || '—'];
     case 'vaccination': return [record.beneficiary_id, record.vaccine, formatDate(record.date), formatDate(record.next_due_date), record.completed ? 'Completed' : 'Pending'];
@@ -38,6 +38,7 @@ const reportRow = (type, record) => {
 
 const Reports = () => {
   const [reportType, setReportType] = useState('beneficiary');
+  const [beneficiaryCategory, setBeneficiaryCategory] = useState('');
   const [dateRange, setDateRange] = useState({
     startDate: '',
     endDate: ''
@@ -55,7 +56,7 @@ const Reports = () => {
     setReport(null);
 
     try {
-      const response = await reportAPI.generate(reportType, dateRange);
+      const response = await reportAPI.generate(reportType, dateRange, reportType === 'beneficiary' ? beneficiaryCategory : '');
       setReport(response);
       setMessage('Report generated successfully!');
     } catch (err) {
@@ -99,6 +100,16 @@ const Reports = () => {
                   <option value="centre">Centre Report</option>
                 </select>
               </div>
+              {reportType === 'beneficiary' && <div className="form-group">
+                <label>Category</label>
+                <select value={beneficiaryCategory} onChange={(e) => setBeneficiaryCategory(e.target.value)}>
+                  <option value="">All categories</option>
+                  <option value="child">Child</option>
+                  <option value="pregnant_woman">Pregnant woman</option>
+                  <option value="lactating_mother">Lactating mother</option>
+                  <option value="elderly_person">Elderly person</option>
+                </select>
+              </div>}
               <div className="form-group">
                 <label>Start Date</label>
                 <input
