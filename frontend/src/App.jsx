@@ -18,6 +18,7 @@ import Map from './pages/Map';
 import OCR from './pages/OCR';
 import Statistics from './pages/Statistics';
 import Centres from './pages/Centres';
+import ChildProfile from './pages/ChildProfile';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -50,6 +51,11 @@ function App() {
           <Route path="/beneficiaries/:id" element={
             <ProtectedRoute allowedRoles={['worker', 'admin']}>
               <BeneficiaryDetails />
+            </ProtectedRoute>
+          } />
+          <Route path="/child-profile" element={
+            <ProtectedRoute allowedRoles={['parent', 'admin']}>
+              <ChildProfile />
             </ProtectedRoute>
           } />
           <Route path="/health" element={

@@ -32,6 +32,7 @@ export const StatCard = ({ title, value, subtitle, to }) => {
 export const BeneficiaryCard = ({ beneficiary }) => (
   <div className="beneficiary-card">
     <h4>{beneficiary.name}</h4>
+    {beneficiary.beneficiaryId && <p>Beneficiary ID: <strong>{beneficiary.beneficiaryId}</strong></p>}
     <p>Age: {beneficiary.age}</p>
     <p>Gender: {beneficiary.gender}</p>
     <p>Status: {beneficiary.status}</p>
