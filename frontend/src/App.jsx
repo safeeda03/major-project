@@ -16,6 +16,8 @@ import Alerts from './pages/Alerts';
 import Chatbot from './pages/Chatbot';
 import Map from './pages/Map';
 import OCR from './pages/OCR';
+import Statistics from './pages/Statistics';
+import Centres from './pages/Centres';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -78,6 +80,16 @@ function App() {
           <Route path="/alerts" element={
             <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
               <Alerts />
+            </ProtectedRoute>
+          } />
+          <Route path="/statistics" element={
+            <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+              <Statistics />
+            </ProtectedRoute>
+          } />
+          <Route path="/centres" element={
+            <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+              <Centres />
             </ProtectedRoute>
           } />
           <Route path="/reports/alerts/:type" element={

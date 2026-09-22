@@ -109,6 +109,27 @@ app.get('/api/gis/centres', async (req, res) => {
   }
 });
 
+app.post('/api/gis/centres', async (req, res) => {
+  try {
+    const AnganwadiCentre = require('./models/AnganwadiCentre');
+    const { centre_id, name, latitude, longitude, address } = req.body;
+    const centre = await AnganwadiCentre.create({
+      centre_id: String(centre_id || '').trim(),
+      name: String(name || '').trim(),
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      address: String(address || '').trim()
+    });
+    res.status(201).json(centre);
+  } catch (error) {
+    const duplicateCentre = error?.code === 11000;
+    res.status(duplicateCentre ? 409 : 400).json({
+      message: duplicateCentre ? 'A centre with this Centre ID already exists.' : 'Could not save centre details.',
+      error: error.message
+    });
+  }
+});
+
 app.get('/api/gis/clustering', async (req, res) => {
   try {
     // This would perform clustering analysis

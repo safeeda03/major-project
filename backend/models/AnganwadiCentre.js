@@ -18,6 +18,10 @@ const anganwadiCentreSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  address: {
+    type: String,
+    trim: true
+  },
   createdAt: {
     type: Date,
     default: Date.now

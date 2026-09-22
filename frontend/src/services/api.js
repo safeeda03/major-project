@@ -102,6 +102,7 @@ export const reportAPI = {
     method: 'POST',
     body: JSON.stringify({ reportType, ...dateRange })
   }),
+  getCentreStatistics: () => request('/reports/statistics/centres'),
   getAlerts: () => request('/reports/alerts'),
   getAlertDetails: (type) => request(`/reports/alerts/${type}`)
 };
@@ -161,14 +162,8 @@ export const chatbotAPI = {
 
 // GIS API
 export const gisAPI = {
-  getCentres: async () => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [
-      { _id: '1', centre_id: 'ANG001', name: 'Anganwadi Centre A', latitude: 28.6139, longitude: 77.2090, address: 'Sector 1, New Delhi' },
-      { _id: '2', centre_id: 'ANG002', name: 'Anganwadi Centre B', latitude: 28.6150, longitude: 77.2100, address: 'Sector 2, New Delhi' },
-      { _id: '3', centre_id: 'ANG003', name: 'Anganwadi Centre C', latitude: 28.6170, longitude: 77.2080, address: 'Sector 3, New Delhi' }
-    ];
-  },
+  getCentres: () => request('/gis/centres'),
+  createCentre: (data) => request('/gis/centres', { method: 'POST', body: JSON.stringify(data) }),
   
   getClustering: async () => {
     await new Promise(resolve => setTimeout(resolve, 300));

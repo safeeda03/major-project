@@ -3,6 +3,7 @@ const NutritionRecord = require('../models/NutritionRecord');
 const Vaccination = require('../models/Vaccination');
 const Beneficiary = require('../models/Beneficiary');
 const Attendance = require('../models/Attendance');
+const AnganwadiCentre = require('../models/AnganwadiCentre');
 
 const latestRecordsByBeneficiary = (records) => {
   const latest = new Map();
@@ -74,6 +75,73 @@ exports.generateReport = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Summarise the latest child-care records for every Anganwadi centre.
+exports.getCentreStatistics = async (req, res) => {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const [centres, beneficiaries, healthRecords, nutritionRecords, vaccinations, attendance] = await Promise.all([
+      AnganwadiCentre.find(),
+      Beneficiary.find(),
+      HealthRecord.find(),
+      NutritionRecord.find(),
+      Vaccination.find({ completed: { $ne: true } }),
+      Attendance.find({ date: { $gte: thirtyDaysAgo } })
+    ]);
+
+    const centreNames = new Map(centres.map((centre) => [centre.centre_id, centre.name]));
+    const beneficiariesByCentre = beneficiaries.reduce((groups, beneficiary) => {
+      const centreId = beneficiary.anganwadi_id || 'Not assigned';
+      if (!groups.has(centreId)) groups.set(centreId, []);
+      groups.get(centreId).push(beneficiary);
+      return groups;
+    }, new Map());
+    centres.forEach((centre) => {
+      if (!beneficiariesByCentre.has(centre.centre_id)) beneficiariesByCentre.set(centre.centre_id, []);
+    });
+
+    const latestHealth = new Map(latestRecordsByBeneficiary(healthRecords).map((record) => [record.beneficiary_id, record]));
+    const latestNutrition = new Map(latestRecordsByBeneficiary(nutritionRecords).map((record) => [record.beneficiary_id, record]));
+    const attendanceByBeneficiary = attendance.reduce((groups, record) => {
+      const current = groups.get(record.beneficiary_id) || { total: 0, units: 0 };
+      current.total += 1;
+      current.units += record.status === 'present' ? 1 : record.status === 'half-day' ? 0.5 : 0;
+      groups.set(record.beneficiary_id, current);
+      return groups;
+    }, new Map());
+
+    const statistics = [...beneficiariesByCentre.entries()].map(([centre_id, centreBeneficiaries]) => {
+      const beneficiaryIds = new Set(centreBeneficiaries.map((beneficiary) => beneficiary.beneficiary_id));
+      const healthRisk = centreBeneficiaries.filter((beneficiary) => {
+        const record = latestHealth.get(beneficiary.beneficiary_id);
+        return record && record.health_status !== 'normal';
+      }).length;
+      const nutritionRisk = centreBeneficiaries.filter((beneficiary) => {
+        const record = latestNutrition.get(beneficiary.beneficiary_id);
+        return record && ['underweight', 'stunted', 'wasted'].includes(record.nutrition_status);
+      }).length;
+      const attendanceSummary = centreBeneficiaries.reduce((summary, beneficiary) => {
+        const record = attendanceByBeneficiary.get(beneficiary.beneficiary_id);
+        if (record) { summary.total += record.total; summary.units += record.units; }
+        return summary;
+      }, { total: 0, units: 0 });
+      return {
+        centre_id,
+        centreName: centreNames.get(centre_id) || centre_id,
+        beneficiaries: centreBeneficiaries.length,
+        healthRisk,
+        nutritionRisk,
+        pendingVaccinations: vaccinations.filter((record) => beneficiaryIds.has(record.beneficiary_id)).length,
+        attendanceRate: attendanceSummary.total ? Math.round((attendanceSummary.units / attendanceSummary.total) * 100) : null
+      };
+    }).sort((a, b) => a.centreName.localeCompare(b.centreName));
+
+    res.json(statistics);
+  } catch (error) {
+    res.status(500).json({ message: 'Could not calculate centre statistics', error: error.message });
   }
 };
 
