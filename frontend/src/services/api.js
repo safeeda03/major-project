@@ -2,12 +2,17 @@
 const API_BASE_URL = '/api';
 
 const request = async (path, options = {}) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      ...options,
+    });
+  } catch {
+    throw new Error('Cannot reach the backend server. Start it with “npm run dev” inside the backend folder.');
+  }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Request failed');
+  if (!response.ok) throw new Error(data.message || `The backend request failed (HTTP ${response.status}). Start the backend server and try again.`);
   return data;
 };
 
@@ -164,6 +169,7 @@ export const chatbotAPI = {
 export const gisAPI = {
   getCentres: () => request('/gis/centres'),
   createCentre: (data) => request('/gis/centres', { method: 'POST', body: JSON.stringify(data) }),
+  updateCentre: (id, data) => request(`/gis/centres/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   
   getClustering: async () => {
     await new Promise(resolve => setTimeout(resolve, 300));

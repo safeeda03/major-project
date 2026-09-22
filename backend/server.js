@@ -51,7 +51,8 @@ const upload = multer({
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/poshanai', {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000
 })
 .then(() => console.log('MongoDB connected successfully'))
 .catch(err => console.error('MongoDB connection error:', err));
@@ -111,20 +112,52 @@ app.get('/api/gis/centres', async (req, res) => {
 
 app.post('/api/gis/centres', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ message: 'MongoDB is not connected. Start the MongoDB service, then try saving the centre again.' });
+    }
     const AnganwadiCentre = require('./models/AnganwadiCentre');
-    const { centre_id, name, latitude, longitude, address } = req.body;
+    const { centre_id, name, latitude, longitude, address, worker_name, worker_phone } = req.body;
     const centre = await AnganwadiCentre.create({
       centre_id: String(centre_id || '').trim(),
       name: String(name || '').trim(),
       latitude: Number(latitude),
       longitude: Number(longitude),
-      address: String(address || '').trim()
+      address: String(address || '').trim(),
+      worker_name: String(worker_name || '').trim(),
+      worker_phone: String(worker_phone || '').trim()
     });
     res.status(201).json(centre);
   } catch (error) {
     const duplicateCentre = error?.code === 11000;
     res.status(duplicateCentre ? 409 : 400).json({
       message: duplicateCentre ? 'A centre with this Centre ID already exists.' : 'Could not save centre details.',
+      error: error.message
+    });
+  }
+});
+
+app.put('/api/gis/centres/:id', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ message: 'MongoDB is not connected. Start the MongoDB service, then try updating the centre again.' });
+    }
+    const AnganwadiCentre = require('./models/AnganwadiCentre');
+    const { centre_id, name, latitude, longitude, address, worker_name, worker_phone } = req.body;
+    const centre = await AnganwadiCentre.findByIdAndUpdate(req.params.id, {
+      centre_id: String(centre_id || '').trim(),
+      name: String(name || '').trim(),
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      address: String(address || '').trim(),
+      worker_name: String(worker_name || '').trim(),
+      worker_phone: String(worker_phone || '').trim()
+    }, { new: true, runValidators: true });
+    if (!centre) return res.status(404).json({ message: 'Centre not found.' });
+    res.json(centre);
+  } catch (error) {
+    const duplicateCentre = error?.code === 11000;
+    res.status(duplicateCentre ? 409 : 400).json({
+      message: duplicateCentre ? 'A centre with this Centre ID already exists.' : 'Could not update centre details.',
       error: error.message
     });
   }
