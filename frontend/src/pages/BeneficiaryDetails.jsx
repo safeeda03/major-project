@@ -108,7 +108,7 @@ const BeneficiaryDetails = () => {
               <div><span>Beneficiary ID</span><strong>{data.beneficiary.beneficiary_id}</strong></div>
               <div><span>Date of Birth</span><strong>{formatDate(data.beneficiary.dob)}</strong></div>
               <div><span>Gender</span><strong>{data.beneficiary.gender}</strong></div>
-              <div><span>Beneficiary type</span><strong>{{ child: 'Child', pregnant_woman: 'Pregnant woman', lactating_mother: 'Lactating mother' }[data.beneficiary.beneficiary_type] || 'Child'}</strong></div>
+              <div><span>Beneficiary type</span><strong>{{ child: 'Child', pregnant_woman: 'Pregnant woman', lactating_mother: 'Lactating mother', elderly_person: 'Elderly person' }[data.beneficiary.beneficiary_type] || 'Child'}</strong></div>
               <div><span>Centre ID</span><strong>{data.beneficiary.anganwadi_id}</strong></div>
               {data.beneficiary.contact_phone && <div><span>Contact phone</span><strong>{data.beneficiary.contact_phone}</strong></div>}
             </div>

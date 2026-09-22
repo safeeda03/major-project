@@ -103,9 +103,9 @@ export const vaccinationAPI = {
 
 // Report API
 export const reportAPI = {
-  generate: (reportType, dateRange) => request('/reports/generate', {
+  generate: (reportType, dateRange, beneficiaryCategory) => request('/reports/generate', {
     method: 'POST',
-    body: JSON.stringify({ reportType, ...dateRange })
+    body: JSON.stringify({ reportType, ...dateRange, beneficiaryCategory })
   }),
   getCentreStatistics: () => request('/reports/statistics/centres'),
   getAlerts: () => request('/reports/alerts'),

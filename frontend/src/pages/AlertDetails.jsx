@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import { reportAPI } from '../services/api';
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '—');
+const categoryLabel = (type) => ({ child: 'Child', pregnant_woman: 'Pregnant woman', lactating_mother: 'Lactating mother', elderly_person: 'Elderly person' }[type] || '—');
 
 const AlertDetails = () => {
   const { type } = useParams();
@@ -36,11 +37,12 @@ const AlertDetails = () => {
             <h2>{data.title}</h2>
             <p>{data.records.length} {data.records.length === 1 ? 'beneficiary' : 'beneficiaries'} affected.</p>
             {data.records.length ? <div className="records-table-wrapper"><table className="records-table">
-              <thead><tr><th>Beneficiary</th><th>Beneficiary ID</th><th>Alert</th><th>Date</th></tr></thead>
+              <thead><tr><th>Beneficiary</th><th>Beneficiary ID</th><th>Category</th><th>Alert</th><th>Date</th></tr></thead>
               <tbody>{data.records.map((record, index) => (
                 <tr key={`${record.beneficiary_id}-${index}`}>
                   <td>{record.beneficiary ? <Link className="child-link" to={`/beneficiaries/${record.beneficiary._id}`}>{record.beneficiary.name}</Link> : 'Unknown beneficiary'}</td>
                   <td>{record.beneficiary_id}</td>
+                  <td>{categoryLabel(record.beneficiary?.beneficiary_type)}</td>
                   <td>{record.status}</td>
                   <td>{formatDate(record.date)}</td>
                 </tr>

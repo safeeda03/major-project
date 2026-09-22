@@ -36,6 +36,7 @@ exports.login = async (req, res) => {
       token,
       user: {
         id: user._id,
+        user_id: user.user_id,
         name: user.name,
         phone: user.phone,
         role: user.role

@@ -21,7 +21,7 @@ const latestRecordsByBeneficiary = (records) => {
 // Generate report
 exports.generateReport = async (req, res) => {
   try {
-    const { reportType, startDate, endDate } = req.body;
+    const { reportType, startDate, endDate, beneficiaryCategory } = req.body;
 
     let data = [];
     const dateFilter = {};
@@ -33,7 +33,7 @@ exports.generateReport = async (req, res) => {
 
     switch (reportType) {
       case 'beneficiary':
-        data = await Beneficiary.find();
+        data = await Beneficiary.find(beneficiaryCategory ? { beneficiary_type: beneficiaryCategory } : {});
         break;
       case 'health':
         data = await HealthRecord.find(dateFilter);

@@ -22,7 +22,7 @@ const beneficiarySchema = new mongoose.Schema({
   },
   beneficiary_type: {
     type: String,
-    enum: ['child', 'pregnant_woman', 'lactating_mother'],
+    enum: ['child', 'pregnant_woman', 'lactating_mother', 'elderly_person'],
     default: 'child'
   },
   contact_phone: String,
