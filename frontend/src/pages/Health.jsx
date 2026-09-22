@@ -21,9 +21,7 @@ const Health = () => {
     const loadChildren = async () => {
       setRecordsLoading(true); setError('');
       try {
-        const beneficiaries = await beneficiaryAPI.getAll();
-        const parentIds = new Set([user?.id, user?.user_id, user?._id].filter(Boolean));
-        const linkedChildren = beneficiaries.filter((beneficiary) => parentIds.has(beneficiary.parent_id));
+        const linkedChildren = await beneficiaryAPI.getByParent(user.id || user.user_id || user._id);
         setChildren(linkedChildren);
         setSelectedChildId(linkedChildren[0]?.beneficiary_id || '');
       } catch (err) { setError(err.message || 'Could not load child profiles.'); }
@@ -61,7 +59,7 @@ const Health = () => {
       <h3>Health Records Added by Your Anganwadi Worker</h3>
       <p>These records are view-only and show only children linked to your parent account.</p>
       {error && <div className="error-message">{error}</div>}
-      {!recordsLoading && children.length > 0 && <div className="form-group"><label>Child</label><select value={selectedChildId} onChange={(event) => setSelectedChildId(event.target.value)}>{children.map((child) => <option key={child.beneficiary_id} value={child.beneficiary_id}>{child.name} ({child.beneficiary_id})</option>)}</select></div>}
+      {!recordsLoading && children.length > 0 && <p><strong>Child:</strong> {children[0].name} ({children[0].beneficiary_id})</p>}
       {recordsLoading ? <p>Loading health records...</p> : !children.length ? <p>No child profile is linked to this parent account.</p> : <div className="records-table-wrapper"><table className="records-table"><thead><tr><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead><tbody>{sortedRecords.length ? sortedRecords.map((record) => <tr key={record._id}><td>{record.date ? new Date(record.date).toLocaleDateString() : '—'}</td><td>{record.height} cm</td><td>{record.weight} kg</td><td>{record.bmi ?? '—'}</td><td>{record.health_status || '—'}</td></tr>) : <tr><td colSpan="5">No health records have been added for this child.</td></tr>}</tbody></table></div>}
     </div> : <div className="form-container"><h3>Add Health Measurement</h3><form onSubmit={handleSubmit}>
       <div className="form-group"><label>Beneficiary ID</label><input type="text" name="beneficiary_id" value={formData.beneficiary_id} onChange={handleChange} required /></div>

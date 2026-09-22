@@ -28,9 +28,7 @@ const ParentDashboard = () => {
     const loadChildren = async () => {
       setLoading(true); setError('');
       try {
-        const beneficiaries = await beneficiaryAPI.getAll();
-        const parentIds = new Set([user?.id, user?.user_id, user?._id].filter(Boolean));
-        const linkedChildren = beneficiaries.filter((beneficiary) => parentIds.has(beneficiary.parent_id));
+        const linkedChildren = await beneficiaryAPI.getByParent(user.id || user.user_id || user._id);
         setChildren(linkedChildren); setSelectedChildId(linkedChildren[0]?.beneficiary_id || '');
       } catch (err) { setError(err.message || 'Could not load your child profile.'); }
       finally { setLoading(false); }

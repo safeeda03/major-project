@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
-import { vaccinationAPI } from '../services/api';
+import { beneficiaryAPI, vaccinationAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const Vaccination = () => {
+  const { user } = useAuth();
+  const isParent = user?.role === 'parent';
   const [formData, setFormData] = useState({
     beneficiary_id: '',
     vaccine: '',
@@ -13,6 +16,20 @@ const Vaccination = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [linkedChild, setLinkedChild] = useState(null);
+
+  useEffect(() => {
+    if (!isParent) return;
+    const loadChild = async () => {
+      try {
+        const children = await beneficiaryAPI.getByParent(user?.id || user?.user_id || user?._id);
+        const child = children[0] || null;
+        setLinkedChild(child);
+        if (child) setFormData((current) => ({ ...current, beneficiary_id: child.beneficiary_id }));
+      } catch (err) { setError(err.message || 'Could not load the linked child profile.'); }
+    };
+    loadChild();
+  }, [isParent, user]);
 
   const handleChange = (e) => {
     setFormData({
@@ -31,7 +48,7 @@ const Vaccination = () => {
       const response = await vaccinationAPI.create(formData);
       setMessage('Vaccination record saved successfully!');
       setFormData({
-        beneficiary_id: '',
+        beneficiary_id: isParent ? linkedChild?.beneficiary_id || '' : '',
         vaccine: '',
         date: new Date().toISOString().split('T')[0],
         next_due_date: ''
@@ -47,7 +64,7 @@ const Vaccination = () => {
     <div className="page">
       <Navbar />
       <div className="page-content">
-        <Sidebar role="worker" />
+        <Sidebar role={isParent ? 'parent' : 'worker'} />
         <main className="main-content">
           <h2>Vaccination Records</h2>
           <div className="form-container">
@@ -60,8 +77,10 @@ const Vaccination = () => {
                   name="beneficiary_id"
                   value={formData.beneficiary_id}
                   onChange={handleChange}
+                  readOnly={isParent}
                   required
                 />
+                {isParent && <small>Your linked child’s beneficiary ID is filled automatically.</small>}
               </div>
               <div className="form-group">
                 <label>Vaccine</label>

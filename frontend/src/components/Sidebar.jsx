@@ -29,7 +29,7 @@ const Sidebar = ({ role }) => {
       { name: 'Nutrition', path: '/nutrition' },
       { name: 'Vaccination', path: '/vaccination' },
       { name: 'Attendance', path: '/attendance' },
-      { name: 'Recommendations', path: '/recommendations' },
+      { name: 'Alerts & Recommendations', path: '/recommendations' },
     ]
   };
 

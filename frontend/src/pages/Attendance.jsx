@@ -27,9 +27,7 @@ const Attendance = () => {
       setRecordsLoading(true);
       setError('');
       try {
-        const [attendance, beneficiaries] = await Promise.all([attendanceAPI.getAll(), beneficiaryAPI.getAll()]);
-        const parentIds = new Set([user?.id, user?.user_id, user?._id].filter(Boolean));
-        const linkedChildren = beneficiaries.filter((beneficiary) => parentIds.has(beneficiary.parent_id));
+        const [attendance, linkedChildren] = await Promise.all([attendanceAPI.getAll(), beneficiaryAPI.getByParent(user?.id || user?.user_id || user?._id)]);
         setChildren(linkedChildren);
         setSelectedChildId(linkedChildren[0]?.beneficiary_id || '');
         setAllRecords(attendance);
@@ -86,7 +84,7 @@ const Attendance = () => {
             <h3>Attendance Marked by Your Anganwadi Worker</h3>
             <p>These attendance records are view-only and show one of your registered children at a time.</p>
             {error && <div className="error-message">{error}</div>}
-            {!recordsLoading && children.length > 0 && <div className="form-group"><label>Child</label><select value={selectedChildId} onChange={(event) => setSelectedChildId(event.target.value)}>{children.map((child) => <option key={child.beneficiary_id} value={child.beneficiary_id}>{child.name} ({child.beneficiary_id})</option>)}</select></div>}
+            {!recordsLoading && children.length > 0 && <p><strong>Child:</strong> {children[0].name} ({children[0].beneficiary_id})</p>}
             {!recordsLoading && children.length > 0 && <div className="form-group"><label>Attendance year</label><select value={selectedYear} onChange={(event) => setSelectedYear(event.target.value)}>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></div>}
             {recordsLoading ? <p>Loading attendance records...</p> : !children.length ? <p>No child profile is linked to this parent account.</p> : <div className="records-table-wrapper"><table className="records-table">
               <thead><tr><th>Beneficiary ID</th><th>Date</th><th>Status</th></tr></thead>

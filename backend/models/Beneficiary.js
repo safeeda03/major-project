@@ -27,6 +27,7 @@ const beneficiarySchema = new mongoose.Schema({
   },
   contact_phone: String,
   notes: String,
+  profile_photo: String,
   parent_id: {
     type: String,
     required: true

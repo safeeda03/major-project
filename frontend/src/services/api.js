@@ -54,6 +54,7 @@ export const authAPI = {
 // Beneficiary API
 export const beneficiaryAPI = {
   getAll: () => request('/beneficiaries'),
+  getByParent: (parentId) => request(`/beneficiaries/parent/${parentId}`),
   getById: (id) => request(`/beneficiaries/${id}`),
   create: (data) => request('/beneficiaries', { method: 'POST', body: JSON.stringify(data) }),
   update: (id, data) => request(`/beneficiaries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
