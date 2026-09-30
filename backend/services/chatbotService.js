@@ -1,6 +1,7 @@
 const MAX_MESSAGE_LENGTH = 4_000;
 const MAX_HISTORY_MESSAGES = 8;
 const REQUEST_TIMEOUT_MS = 45_000;
+const NUTRITION_KNOWLEDGE = require('../data/nutrition-knowledge.json');
 
 const ASSISTANT_INSTRUCTIONS = `You are PoshanAI, a practical child-nutrition counsellor for parents and Anganwadi workers in Kerala and India.
 
@@ -19,7 +20,8 @@ class ChatbotService {
     try {
       const NutritionRecord = require('../models/NutritionRecord');
       const HealthRecord = require('../models/HealthRecord');
-      if (NutritionRecord.db.readyState !== 1) return LOCAL_KNOWLEDGE_CONTEXT;
+      const publicKnowledge = JSON.stringify(NUTRITION_KNOWLEDGE);
+      if (NutritionRecord.db.readyState !== 1) return `${LOCAL_KNOWLEDGE_CONTEXT}\nPublic nutrition knowledge:\n${publicKnowledge}`;
 
       const [nutritionRecords, healthRecords] = await Promise.all([
         NutritionRecord.find().sort({ date: -1 }).limit(12).lean().exec(),
@@ -33,10 +35,10 @@ class ChatbotService {
           type: 'health', beneficiary_id, height, weight, health_status, date,
         })),
       ];
-      return `${LOCAL_KNOWLEDGE_CONTEXT}\nRecent project records (use only when relevant; do not reveal beneficiary IDs):\n${JSON.stringify(records)}`;
+      return `${LOCAL_KNOWLEDGE_CONTEXT}\nPublic nutrition knowledge:\n${publicKnowledge}\nRecent project records (use only when relevant; do not reveal beneficiary IDs):\n${JSON.stringify(records)}`;
     } catch (error) {
       console.warn('Could not load chatbot dataset context:', error.message);
-      return LOCAL_KNOWLEDGE_CONTEXT;
+      return `${LOCAL_KNOWLEDGE_CONTEXT}\nPublic nutrition knowledge:\n${JSON.stringify(NUTRITION_KNOWLEDGE)}`;
     }
   }
 
@@ -180,13 +182,13 @@ Monitoring and referral
     const model = process.env.OLLAMA_MODEL || 'llama3.2:3b';
     const selectedLanguage = this.detectLanguage(message, language);
     const languageInstruction = selectedLanguage === 'ml-IN'
-      ? 'LANGUAGE RULE: The user wrote Malayalam or selected Malayalam. Reply entirely in natural Malayalam script. Do not reply in English, do not transliterate Malayalam, and do not include English explanations. Use short, clear Malayalam sentences.'
+      ? 'LANGUAGE RULE: The user wrote Malayalam or selected Malayalam. Reply entirely in simple, natural Malayalam script. Use the public nutrition knowledge supplied below, but adapt it to the exact question. Do not reply in English, do not transliterate Malayalam, do not invent quantities or medical thresholds, and do not include hidden reasoning.'
       : 'LANGUAGE RULE: Reply entirely in natural English. Do not include Malayalam or another language.';
     const datasetContext = await this.getDatasetContext();
     const messages = [
       { role: 'system', content: `${ASSISTANT_INSTRUCTIONS}\n${languageInstruction}\nPreferred response language: ${selectedLanguage}.\n\n${datasetContext}` },
       ...this.sanitizeHistory(history),
-      { role: 'user', content: `${message}\n\n/no_think` },
+      { role: 'user', content: message },
     ];
 
     let response;

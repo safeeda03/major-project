@@ -1,0 +1,38 @@
+{
+  "source_policy": "Public WHO and UNICEF guidance; use as educational context, not diagnosis.",
+  "sources": [
+    "https://www.who.int/news-room/fact-sheets/detail/infant-and-young-child-feeding",
+    "https://www.who.int/health-topics/complementary-feeding",
+    "https://www.unicef.org/nutrition/early-childhood-nutrition"
+  ],
+  "guidance": [
+    {
+      "topic": "feeding_6_to_23_months",
+      "facts": [
+        "Complementary foods generally begin at 6 months while breastfeeding continues.",
+        "Start with small amounts and gradually increase texture, variety, and quantity.",
+        "Use responsive feeding: notice hunger and fullness cues, encourage patiently, and do not force-feed.",
+        "Offer hygienically prepared food with clean hands and utensils.",
+        "WHO guidance describes 2 to 3 meals daily at 6 to 8 months and 3 to 4 meals daily at 9 to 23 months, with nutritious snacks as needed."
+      ]
+    },
+    {
+      "topic": "children_2_to_5_years",
+      "facts": [
+        "Offer family foods in child-sized portions across regular meals and nutritious snacks.",
+        "Include a staple such as rice, ragi, dosa, idli, or chapati; a protein food such as dal, green gram, egg, fish, or chicken; and vegetables or fruit.",
+        "Milk or curd can be included when tolerated; limit sugary drinks and highly processed snacks.",
+        "Serve food in a texture and pieces the child can chew safely, and supervise eating."
+      ]
+    },
+    {
+      "topic": "poor_growth",
+      "facts": [
+        "Review the child's age, weight, height, appetite, illness history, and growth trend rather than judging from weight alone.",
+        "Record weight and height on the growth chart and discuss a concerning trend with an Anganwadi or health worker.",
+        "Persistent poor appetite, weight loss, swelling, repeated diarrhoea or vomiting, unusual tiredness, or difficulty breathing needs professional assessment.",
+        "Do not prescribe medicines, tonics, or supplements without a qualified health professional."
+      ]
+    }
+  ]
+}
