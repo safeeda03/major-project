@@ -35,6 +35,7 @@ const Chatbot = () => {
   const mediaStreamRef = useRef(null);
   const audioChunksRef = useRef([]);
   const speechRecognitionRef = useRef(null);
+  const lastSpeechTranscriptRef = useRef('');
   const fallbackTranscriptRef = useRef('');
   const inputLanguageRef = useRef(null);
 
@@ -92,15 +93,19 @@ const Chatbot = () => {
         const recognition = new SpeechRecognition();
         recognition.lang = language;
         recognition.interimResults = false;
-        recognition.continuous = true;
+        recognition.continuous = false;
+        recognition.maxAlternatives = 1;
         recognition.onstart = () => setIsRecording(true);
         recognition.onresult = (event) => {
           const transcript = Array.from(event.results)
+            .slice(event.resultIndex)
             .map((result) => result[0]?.transcript || '')
             .join(' ')
             .trim();
+          if (!transcript || transcript === lastSpeechTranscriptRef.current) return;
+          lastSpeechTranscriptRef.current = transcript;
           inputLanguageRef.current = language;
-          setInput((current) => (current ? `${current} ${transcript}` : transcript));
+          setInput((current) => current && current !== transcript ? `${current} ${transcript}` : transcript);
         };
         recognition.onerror = (event) => {
           setIsRecording(false);
@@ -111,6 +116,7 @@ const Chatbot = () => {
         recognition.onend = () => {
           speechRecognitionRef.current = null;
           setIsRecording(false);
+          lastSpeechTranscriptRef.current = '';
         };
         speechRecognitionRef.current = recognition;
         recognition.start();

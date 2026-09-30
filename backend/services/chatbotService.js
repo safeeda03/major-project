@@ -2,18 +2,60 @@ const MAX_MESSAGE_LENGTH = 4_000;
 const MAX_HISTORY_MESSAGES = 8;
 const REQUEST_TIMEOUT_MS = 45_000;
 
-const ASSISTANT_INSTRUCTIONS = `You are PoshanAI, a helpful assistant for families and Anganwadi workers in India. Answer questions about child nutrition, Anganwadi activities, growth monitoring, child development, food, vaccination, and related general health topics. Give practical, clear, respectful educational guidance. Do not diagnose or invent project, child, or beneficiary data. Do not invent official schemes, citations, or statistics. Do not ask for passwords, API keys, Aadhaar numbers, or other unnecessary sensitive information. For emergencies, advise the user to seek urgent professional care. Reply in the language requested by the user: Malayalam for ml-IN and English for en-IN. Return only the final answer, without hidden reasoning or thinking markers.`;
+const ASSISTANT_INSTRUCTIONS = `You are PoshanAI, a practical child-nutrition counsellor for parents and Anganwadi workers in Kerala and India.
+
+Give advice that someone can use at home or during parent counselling. For nutrition or poor-growth questions, explain specific foods and actions, using familiar examples such as rice, ragi, dal, green gram, egg, fish, chicken, milk or curd, banana, and seasonal vegetables. Explain feeding frequency, responsive feeding, hygiene, and how to monitor weight and height on the growth chart. If the child's age is missing and it changes the advice, ask for the age while still giving safe general guidance.
+
+Organise longer answers with short headings and bullet points. Prefer practical examples over phrases like "give a balanced diet". Never diagnose a disease or prescribe medicine. Explain when to contact an Anganwadi worker, ASHA/health worker, or doctor, and mention urgent care for danger signs. Do not invent official schemes, citations, statistics, or beneficiary data. Do not ask for passwords, API keys, Aadhaar numbers, or other unnecessary sensitive information. Reply only in the user's language and return only the final answer without hidden reasoning or thinking markers.`;
 
 class ChatbotService {
   static fallbackResponse(message, language) {
     if (language === 'ml-IN') {
+      if (/ഭാരം കുറവ്|ഭാരം കുറഞ്ഞ|പോഷകാഹാരം മെച്ച|വണ്ണം കുറവ്|ദുർബല/.test(message)) {
+        return `കുട്ടിയുടെ പ്രായം, ഇപ്പോഴത്തെ ഭാരം, ഉയരം എന്നിവ അറിയിച്ചാൽ നിർദ്ദേശം കൂടുതൽ കൃത്യമായി നൽകാം. പൊതുവായി:
+
+പ്രധാന നിർദ്ദേശങ്ങൾ
+- ദിവസം 3 പ്രധാന ഭക്ഷണവും 2–3 ചെറിയ ഇടത്തരം ഭക്ഷണവും നൽകുക. കുട്ടിയെ നിർബന്ധിച്ച് തീറ്റിക്കരുത്; ശാന്തമായി ഇരുത്തി സ്വയം കഴിക്കാൻ പ്രോത്സാഹിപ്പിക്കുക.
+
+ഭക്ഷണത്തിൽ ഉൾപ്പെടുത്താം
+- കഞ്ഞി, ചോറ്, റാഗി എന്നിവയ്‌ക്കൊപ്പം പരിപ്പ് അല്ലെങ്കിൽ ചെറുപയർ ചേർക്കുക.
+- ദിവസവും ഒരു മുട്ട നൽകാം; ലഭ്യമെങ്കിൽ മീൻ അല്ലെങ്കിൽ ചിക്കൻ നൽകാം.
+- പാൽ അല്ലെങ്കിൽ തൈര്, വാഴപ്പഴം, പച്ചക്കറികൾ, നിലക്കടല/എള്ള് ചേർത്ത ഭക്ഷണം എന്നിവ നൽകാം.
+- ഭക്ഷണത്തിൽ കുറച്ച് എണ്ണയോ നെയ്യോ ചേർക്കുന്നത് അധിക ഊർജം നൽകാൻ സഹായിക്കും.
+
+ശ്രദ്ധിക്കേണ്ട കാര്യങ്ങൾ
+- കൈ കഴുകി ശുചിയായി തയ്യാറാക്കിയ ഭക്ഷണം നൽകുക; ഭക്ഷണത്തിന് മുമ്പ് അധികം വെള്ളമോ ചായയോ നൽകി വയറ് നിറയ്ക്കരുത്.
+- ഭാരം, ഉയരം എന്നിവ അങ്കണവാടിയിലെ വളർച്ചാ ചാർട്ടിൽ സ്ഥിരമായി രേഖപ്പെടുത്തുക.
+
+എപ്പോൾ ആരോഗ്യപ്രവർത്തകനെ സമീപിക്കണം
+- ഭാരം തുടർച്ചയായി കൂടാത്തത്, ഭക്ഷണം കഴിക്കാത്തത്, ആവർത്തിച്ചുള്ള വയറിളക്കം/ഛർദ്ദി, വീക്കം, അമിത ക്ഷീണം എന്നിവ ഉണ്ടെങ്കിൽ ഉടൻ ആരോഗ്യപ്രവർത്തകനെ കാണിക്കുക. മരുന്നോ ടോണിക്കോ സ്വയം നൽകരുത്.`;
+      }
       if (/ഭക്ഷണം|തീറ്റ|പോഷണം/.test(message)) {
         return 'കുട്ടിക്ക് പ്രായത്തിന് അനുയോജ്യമായ വൈവിധ്യമാർന്ന ഭക്ഷണം നൽകുക: ധാന്യങ്ങൾ, പയർവർഗങ്ങൾ, മുട്ട അല്ലെങ്കിൽ മറ്റ് പ്രോട്ടീൻ ഭക്ഷണം, പച്ചക്കറികൾ, പഴങ്ങൾ എന്നിവ ഉൾപ്പെടുത്തുക. ആറുമാസം വരെ മുലപ്പാൽ മാത്രം നൽകുകയും, സംശയമുണ്ടെങ്കിൽ അങ്കണവാടി പ്രവർത്തകയെയോ ആരോഗ്യപ്രവർത്തകനെയോ സമീപിക്കുകയും ചെയ്യുക.';
       }
       if (/വളർച്ച|ഭാരം|ഉയരം/.test(message)) {
         return 'കുട്ടിയുടെ ഭാരം, ഉയരം, വളർച്ച എന്നിവ അങ്കണവാടിയിലെ വളർച്ചാ ചാർട്ടിൽ സ്ഥിരമായി രേഖപ്പെടുത്തുക. വളർച്ചയിൽ ആശങ്കയുണ്ടെങ്കിൽ ആരോഗ്യപ്രവർത്തകന്റെ പരിശോധന തേടുക.';
       }
+      if (/ആരോഗ്യം|അസുഖം|പനി|ചുമ|വയറിളക്കം/.test(message)) {
+        return 'പനി, ശ്വാസതടസം, തുടർച്ചയായ ഛർദ്ദി, വയറിളക്കം, അമിതമായ ക്ഷീണം എന്നിവ ഉണ്ടെങ്കിൽ കുട്ടിയെ ഉടൻ ആരോഗ്യകേന്ദ്രത്തിൽ കാണിക്കുക. മരുന്ന് സ്വയം നൽകാതിരിക്കുക.';
+      }
+      if (/കുത്തിവയ്പ്പ്|വാക്സിൻ|പ്രതിരോധ/.test(message)) {
+        return 'കുട്ടിയുടെ വാക്സിനേഷൻ കാർഡ് പരിശോധിച്ച് കുത്തിവയ്പ്പുകൾ സമയത്ത് നൽകുക. തീയതി സംശയമുണ്ടെങ്കിൽ അങ്കണവാടി പ്രവർത്തകയെയോ ആരോഗ്യപ്രവർത്തകനെയോ ചോദിക്കുക.';
+      }
       return 'കുട്ടിയുടെ പോഷണം, വളർച്ച, പ്രതിരോധ കുത്തിവയ്പ്പ് എന്നിവയ്ക്കായി അങ്കണവാടി പ്രവർത്തകയെയോ ആരോഗ്യപ്രവർത്തകനെയോ സമീപിക്കുക. അടിയന്തര ലക്ഷണങ്ങൾ ഉണ്ടെങ്കിൽ ഉടൻ ചികിത്സ തേടുക.';
+    }
+    if (/underweight|poor growth|low weight|malnutrition/i.test(message)) {
+      return `The child's age, current weight, height, and recent growth trend are important, so record them on the Anganwadi growth chart and share them with a health worker. General counselling:
+
+Key actions
+- Offer 3 small main meals plus 2–3 nutritious snacks each day. Sit with the child, encourage self-feeding, and never force-feed.
+- Enrich meals with rice or ragi plus dal or green gram, egg, fish or chicken, and vegetables.
+- Offer milk or curd, banana, and a little oil or ghee in meals when suitable for the child.
+- Use clean water and handwashing, and avoid filling the child with tea, sugary drinks, or excess water before meals.
+
+Monitoring and referral
+- Weigh and measure the child regularly and review the growth chart.
+- Contact the Anganwadi worker or health professional if weight is not increasing, appetite is persistently poor, or there is repeated diarrhoea, vomiting, swelling, or unusual tiredness. Do not give medicines or tonics without professional advice.`;
     }
     if (/food|feed|nutrition/i.test(message)) {
       return 'Offer age-appropriate varied foods including grains, pulses, eggs or other protein, vegetables, and fruit. Breast milk alone is recommended until six months; contact an Anganwadi or health worker for personalised guidance.';
