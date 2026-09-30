@@ -8,6 +8,7 @@ const blankForm = { centre_id: '', name: '', address: '', worker_name: '', worke
 const Centres = () => {
   const [form, setForm] = useState(blankForm);
   const [centres, setCentres] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,6 +37,14 @@ const Centres = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const cancelEdit = () => { setEditingId(null); setForm(blankForm); setError(''); setMessage(''); };
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredCentres = centres.filter((centre) => [
+    centre.centre_id,
+    centre.name,
+    centre.address,
+    centre.worker_name,
+    centre.worker_phone
+  ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery)));
 
   return <div className="page"><Navbar /><div className="page-content"><Sidebar role="supervisor" /><main className="main-content">
     <h2>Anganwadi Centres</h2>
@@ -49,7 +58,7 @@ const Centres = () => {
       <Field label="Longitude"><input name="longitude" type="number" step="any" value={form.longitude} onChange={change} placeholder="e.g. 77.2090" required /></Field>
       <button className="submit-btn" disabled={saving}>{saving ? 'Saving…' : editingId ? 'Update centre details' : 'Upload centre details'}</button>{editingId && <button type="button" className="secondary-btn" onClick={cancelEdit}>Cancel</button>}
     </form>{message && <div className="success-message">{message}</div>}{error && <div className="error-message">{error}</div>}</div>
-    <div className="form-container records-container records-wide"><h3>Saved Centres ({centres.length})</h3>{loading ? <p>Loading centres…</p> : <div className="records-table-wrapper"><table className="records-table"><thead><tr><th>Centre ID</th><th>Centre name</th><th>Address</th><th>Worker name</th><th>Worker phone</th><th>Latitude</th><th>Longitude</th><th>Action</th></tr></thead><tbody>{centres.length ? centres.map((centre) => <tr key={centre._id || centre.centre_id}><td>{centre.centre_id}</td><td>{centre.name}</td><td>{centre.address || '—'}</td><td>{centre.worker_name || '—'}</td><td>{centre.worker_phone || '—'}</td><td>{centre.latitude}</td><td>{centre.longitude}</td><td><button type="button" className="edit-btn" onClick={() => editCentre(centre)}>Edit</button></td></tr>) : <tr><td colSpan="8">No centre details have been uploaded yet.</td></tr>}</tbody></table></div>}</div>
+    <div className="form-container records-container records-wide"><h3>Saved Centres ({filteredCentres.length}{normalizedQuery ? ` of ${centres.length}` : ''})</h3><input className="search-input" type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by centre ID, name, address, worker, or phone" aria-label="Search saved centres" />{loading ? <p>Loading centres…</p> : <div className="records-table-wrapper"><table className="records-table"><thead><tr><th>Centre ID</th><th>Centre name</th><th>Address</th><th>Worker name</th><th>Worker phone</th><th>Latitude</th><th>Longitude</th><th>Action</th></tr></thead><tbody>{filteredCentres.length ? filteredCentres.map((centre) => <tr key={centre._id || centre.centre_id}><td>{centre.centre_id}</td><td>{centre.name}</td><td>{centre.address || '—'}</td><td>{centre.worker_name || '—'}</td><td>{centre.worker_phone || '—'}</td><td>{centre.latitude}</td><td>{centre.longitude}</td><td><button type="button" className="edit-btn" onClick={() => editCentre(centre)}>Edit</button></td></tr>) : <tr><td colSpan="8">{normalizedQuery ? 'No centres match your search.' : 'No centre details have been uploaded yet.'}</td></tr>}</tbody></table></div>}</div>
   </main></div></div>;
 };
 

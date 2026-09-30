@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
-import { reportAPI } from '../services/api';
+import { gisAPI, reportAPI } from '../services/api';
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : '—');
 
@@ -39,6 +39,8 @@ const reportRow = (type, record) => {
 const Reports = () => {
   const [reportType, setReportType] = useState('beneficiary');
   const [beneficiaryCategory, setBeneficiaryCategory] = useState('');
+  const [centreId, setCentreId] = useState('');
+  const [centres, setCentres] = useState([]);
   const [dateRange, setDateRange] = useState({
     startDate: '',
     endDate: ''
@@ -56,7 +58,7 @@ const Reports = () => {
     setReport(null);
 
     try {
-      const response = await reportAPI.generate(reportType, dateRange, reportType === 'beneficiary' ? beneficiaryCategory : '');
+      const response = await reportAPI.generate(reportType, dateRange, reportType === 'beneficiary' ? beneficiaryCategory : '', centreId);
       setReport(response);
       setMessage('Report generated successfully!');
     } catch (err) {
@@ -77,6 +79,7 @@ const Reports = () => {
 
   React.useEffect(() => {
     loadAlerts();
+    gisAPI.getCentres().then((response) => setCentres(Array.isArray(response) ? response : [])).catch(() => setCentres([]));
   }, []);
 
   return (
@@ -110,6 +113,13 @@ const Reports = () => {
                   <option value="elderly_person">Elderly person</option>
                 </select>
               </div>}
+              <div className="form-group">
+                <label>Centre ID</label>
+                <select value={centreId} onChange={(e) => setCentreId(e.target.value)}>
+                  <option value="">All centres</option>
+                  {centres.map((centre) => <option key={centre.centre_id} value={centre.centre_id}>{centre.centre_id}{centre.name ? ` — ${centre.name}` : ''}</option>)}
+                </select>
+              </div>
               <div className="form-group">
                 <label>Start Date</label>
                 <input
@@ -151,6 +161,7 @@ const Reports = () => {
                 <h2>PoshanAI</h2>
                 <h3>{reportLabels[report.reportType]}</h3>
                 <p>Generated: {formatDate(report.generatedAt)} · {report.count} record{report.count === 1 ? '' : 's'}</p>
+                {report.centreId && <p>Centre: {report.centreId}{report.centreName ? ` — ${report.centreName}` : ''}</p>}
                 {(dateRange.startDate || dateRange.endDate) && <p>Period: {dateRange.startDate ? formatDate(dateRange.startDate) : 'Beginning'} to {dateRange.endDate ? formatDate(dateRange.endDate) : 'Today'}</p>}
               </div>
               <button type="button" className="print-btn" onClick={() => window.print()}>Print / Save PDF</button>

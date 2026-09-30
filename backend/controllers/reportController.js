@@ -21,7 +21,14 @@ const latestRecordsByBeneficiary = (records) => {
 // Generate report
 exports.generateReport = async (req, res) => {
   try {
-    const { reportType, startDate, endDate, beneficiaryCategory } = req.body;
+    const { reportType, startDate, endDate, beneficiaryCategory, centreId } = req.body;
+    const normalizedCentreId = String(centreId || '').trim();
+
+    let centre = null;
+    if (normalizedCentreId) {
+      centre = await AnganwadiCentre.findOne({ centre_id: normalizedCentreId });
+      if (!centre) return res.status(400).json({ message: 'Invalid Centre ID' });
+    }
 
     let data = [];
     const dateFilter = {};
@@ -31,30 +38,41 @@ exports.generateReport = async (req, res) => {
       if (endDate) dateFilter.date.$lte = new Date(`${endDate}T23:59:59.999Z`);
     }
 
+    const beneficiaryFilter = normalizedCentreId ? { anganwadi_id: normalizedCentreId } : {};
+    const centreBeneficiaryIds = normalizedCentreId
+      ? (await Beneficiary.find(beneficiaryFilter).select('beneficiary_id')).map((beneficiary) => beneficiary.beneficiary_id)
+      : null;
+    const recordFilter = normalizedCentreId
+      ? { ...dateFilter, beneficiary_id: { $in: centreBeneficiaryIds } }
+      : dateFilter;
+
     switch (reportType) {
       case 'beneficiary':
-        data = await Beneficiary.find(beneficiaryCategory ? { beneficiary_type: beneficiaryCategory } : {});
+        data = await Beneficiary.find({
+          ...beneficiaryFilter,
+          ...(beneficiaryCategory ? { beneficiary_type: beneficiaryCategory } : {})
+        });
         break;
       case 'health':
-        data = await HealthRecord.find(dateFilter);
+        data = await HealthRecord.find(recordFilter);
         break;
       case 'nutrition':
-        data = await NutritionRecord.find(dateFilter);
+        data = await NutritionRecord.find(recordFilter);
         break;
       case 'vaccination':
-        data = await Vaccination.find(dateFilter);
+        data = await Vaccination.find(recordFilter);
         break;
       case 'attendance':
-        data = await Attendance.find(dateFilter);
+        data = await Attendance.find(recordFilter);
         break;
       case 'centre': {
-        const beneficiaryFilter = {};
+        const centreReportBeneficiaryFilter = { ...beneficiaryFilter };
         if (startDate || endDate) {
-          beneficiaryFilter.createdAt = {};
-          if (startDate) beneficiaryFilter.createdAt.$gte = new Date(`${startDate}T00:00:00.000Z`);
-          if (endDate) beneficiaryFilter.createdAt.$lte = new Date(`${endDate}T23:59:59.999Z`);
+          centreReportBeneficiaryFilter.createdAt = {};
+          if (startDate) centreReportBeneficiaryFilter.createdAt.$gte = new Date(`${startDate}T00:00:00.000Z`);
+          if (endDate) centreReportBeneficiaryFilter.createdAt.$lte = new Date(`${endDate}T23:59:59.999Z`);
         }
-        const beneficiaries = await Beneficiary.find(beneficiaryFilter);
+        const beneficiaries = await Beneficiary.find(centreReportBeneficiaryFilter);
         const centres = beneficiaries.reduce((summary, beneficiary) => {
           const centreId = beneficiary.anganwadi_id || 'Not assigned';
           summary.set(centreId, (summary.get(centreId) || 0) + 1);
@@ -71,6 +89,8 @@ exports.generateReport = async (req, res) => {
       reportType,
       data,
       count: data.length,
+      centreId: normalizedCentreId || undefined,
+      centreName: centre?.name,
       generatedAt: new Date()
     });
   } catch (error) {
