@@ -157,14 +157,25 @@ const retiredChatbotMock = {
 */
 
 export const chatbotAPI = {
-  sendMessage: async (message, history = []) => {
+  sendMessage: async (message, history = [], language = 'en-IN') => {
     const response = await fetch('/api/chatbot/message', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history }),
+      body: JSON.stringify({ message, history, language }),
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'Could not reach the AI assistant');
+    return data;
+  },
+
+  transcribeVoice: async (audioBlob, language = 'en-IN') => {
+    const formData = new FormData();
+    const extension = audioBlob.type.includes('ogg') ? 'ogg' : 'webm';
+    formData.append('audio', audioBlob, `poshanai-voice.${extension}`);
+    formData.append('language', language);
+    const response = await fetch('/api/chatbot/voice', { method: 'POST', body: formData });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || 'Voice recognition is currently unavailable. Please type your question instead.');
     return data;
   }
 };

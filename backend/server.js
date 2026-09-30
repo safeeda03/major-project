@@ -48,6 +48,21 @@ const upload = multer({
   }
 });
 
+const voiceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = new Set([
+      'audio/webm', 'audio/webm;codecs=opus', 'audio/ogg', 'audio/wav',
+      'audio/mp4', 'audio/mpeg', 'audio/x-m4a', 'video/webm'
+    ]);
+    if (allowedTypes.has(file.mimetype)) return cb(null, true);
+    const error = new Error('Unsupported audio format. Please record again in your browser.');
+    error.statusCode = 400;
+    return cb(error);
+  }
+});
+
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/poshanai', {
   useNewUrlParser: true,
@@ -90,12 +105,26 @@ app.post('/api/ocr/process', upload.single('document'), async (req, res) => {
 // Chatbot Routes
 app.post('/api/chatbot/message', async (req, res) => {
   try {
-    const { message, history } = req.body;
+    const { message, history, language } = req.body;
     const ChatbotService = require('./services/chatbotService');
-    const response = await ChatbotService.processMessage(message, history);
+    const response = await ChatbotService.processMessage(message, history, language);
     res.json(response);
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message || 'Chatbot error' });
+  }
+});
+
+app.post('/api/chatbot/voice', voiceUpload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No audio recording was uploaded.' });
+    const SpeechService = require('./services/speechService');
+    const result = await SpeechService.transcribe(req.file, req.body.language);
+    res.json(result);
+  } catch (error) {
+    console.error('Voice transcription failed:', error.message);
+    res.status(error.statusCode || 503).json({
+      message: 'Voice recognition is currently unavailable. Please type your question instead.'
+    });
   }
 });
 
@@ -195,7 +224,10 @@ app.get('/api/health-check', (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    return res.status(400).json({ message: err.code === 'LIMIT_FILE_SIZE' ? 'OCR images must be 10 MB or smaller.' : err.message });
+    const isVoiceUpload = req.path === '/api/chatbot/voice';
+    return res.status(400).json({ message: err.code === 'LIMIT_FILE_SIZE'
+      ? (isVoiceUpload ? 'Audio recordings must be 15 MB or smaller.' : 'OCR images must be 10 MB or smaller.')
+      : err.message });
   }
 
   console.error(err.stack || err.message);
