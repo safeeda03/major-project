@@ -1,10 +1,12 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const Navbar = () => {
   const { user, logout, hasRole } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isLoginPage = location.pathname === '/' || location.pathname === '/login';
 
   const handleLogout = async () => {
     await logout();
@@ -20,9 +22,9 @@ const Navbar = () => {
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <h1>PoshanAI</h1>
+        <h1>Poshan<span>AI</span></h1>
       </div>
-      {user && <div className="navbar-menu">
+      {user && !isLoginPage && <div className="navbar-menu">
         <a href={getDashboardPath()}>Dashboard</a>
         {hasRole(['worker', 'admin']) && <a href="/beneficiaries">Beneficiaries</a>}
         {hasRole(['worker', 'supervisor', 'admin']) && <a href="/reports">Reports</a>}

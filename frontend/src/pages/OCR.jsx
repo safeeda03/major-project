@@ -17,7 +17,7 @@ const OCR = () => {
 
   const handleProcess = async () => {
     if (!file) {
-      setError('Select a JPG, PNG, or WebP image first.');
+      setError('Select a PDF, JPG, PNG, or WebP file first.');
       return;
     }
 
@@ -43,11 +43,11 @@ const OCR = () => {
         <main className="main-content">
           <h2>OCR Document Processing</h2>
           <div className="form-container">
-            <h3>Scan an image</h3>
-            <p>Upload a clear image of the document. OCR results must be checked against the original before use.</p>
+            <h3>Scan a document</h3>
+            <p>Upload a PDF or a clear JPG, PNG, or WebP image. OCR results must be checked against the original before use.</p>
             <div className="form-group">
-              <label htmlFor="ocr-document">Document image</label>
-              <input id="ocr-document" type="file" onChange={handleFileChange} accept="image/jpeg,image/png,image/webp" />
+              <label htmlFor="ocr-document">Document file</label>
+              <input id="ocr-document" type="file" onChange={handleFileChange} accept="application/pdf,image/jpeg,image/png,image/webp,.pdf" />
             </div>
             <button type="button" onClick={handleProcess} className="submit-btn" disabled={loading || !file}>
               {loading ? 'Processing…' : 'Extract text'}
@@ -62,7 +62,11 @@ const OCR = () => {
                   <p><strong>Child name:</strong> {result.childName || 'Not detected'}</p>
                   <p><strong>Date of birth:</strong> {result.dateOfBirth || 'Not detected'}</p>
                   <p><strong>Parent or guardian:</strong> {result.parentName || 'Not detected'}</p>
-                  <p><strong>Confidence:</strong> {Number(result.confidence || 0).toFixed(1)}%</p>
+                  {result.beneficiaryId && <p><strong>Beneficiary ID:</strong> {result.beneficiaryId}</p>}
+                  {result.anganwadiId && <p><strong>Anganwadi ID:</strong> {result.anganwadiId}</p>}
+                  {result.nutritionDetails && <p><strong>Nutrition details:</strong> {result.nutritionDetails}</p>}
+                  {result.healthInformation && <p><strong>Health information:</strong> {result.healthInformation}</p>}
+                  {result.confidence != null && <p><strong>Confidence:</strong> {Number(result.confidence).toFixed(1)}%</p>}
 
                   {result.vaccinationRecords?.length > 0 && (
                     <div>
@@ -75,8 +79,6 @@ const OCR = () => {
                     </div>
                   )}
 
-                  <h4>Recognized text</h4>
-                  <pre className="ocr-raw-text">{result.rawText || 'No readable text found.'}</pre>
                 </div>
               </div>
             )}

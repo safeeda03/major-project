@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 const uploadsDirectory = path.join(__dirname, 'uploads');
 fs.mkdirSync(uploadsDirectory, { recursive: true });
 
-// Configure multer for short-lived OCR image uploads.
+// Configure multer for short-lived OCR image and PDF uploads.
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadsDirectory);
@@ -34,15 +34,15 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-    const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.pdf']);
+    const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
     const extension = path.extname(file.originalname).toLowerCase();
 
     if (allowedExtensions.has(extension) && allowedMimeTypes.has(file.mimetype)) {
       return cb(null, true);
     }
 
-    const error = new Error('Only JPG, PNG, and WebP images are supported for OCR.');
+    const error = new Error('Only PDF, JPG, PNG, and WebP files are supported for OCR.');
     error.statusCode = 400;
     return cb(error);
   }
