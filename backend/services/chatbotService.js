@@ -115,8 +115,8 @@ Monitoring and referral
   }
 
   static isUsableResponse(content, language) {
-    if (!content || content.length > 900) return false;
-    if (/Okay, let me|Let me think|Possible response|Wait, the user|I need to respond|The answer should/i.test(content)) return false;
+    if (!content || content.length > 3_000) return false;
+    if (/<think>|<\/think>|^Okay, the user|^Let me think|^I need to respond/i.test(content)) return false;
     if (language === 'ml-IN') return (content.match(/[\u0D00-\u0D7F]/g) || []).length >= 8;
     return true;
   }
