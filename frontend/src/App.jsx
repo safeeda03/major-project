@@ -90,7 +90,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/alerts" element={
-            <ProtectedRoute allowedRoles={['supervisor']}>
+            <ProtectedRoute allowedRoles={['worker', 'supervisor']}>
               <Alerts />
             </ProtectedRoute>
           } />

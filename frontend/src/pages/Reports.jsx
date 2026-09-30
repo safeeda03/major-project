@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import { gisAPI, reportAPI } from '../services/api';
@@ -48,7 +47,6 @@ const Reports = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [alerts, setAlerts] = useState([]);
   const [report, setReport] = useState(null);
 
   const handleGenerateReport = async () => {
@@ -68,17 +66,7 @@ const Reports = () => {
     }
   };
 
-  const loadAlerts = async () => {
-    try {
-      const response = await reportAPI.getAlerts();
-      setAlerts(Array.isArray(response) ? response : response.alerts || []);
-    } catch (err) {
-      console.error('Failed to load alerts:', err);
-    }
-  };
-
   React.useEffect(() => {
-    loadAlerts();
     gisAPI.getCentres().then((response) => setCentres(Array.isArray(response) ? response : [])).catch(() => setCentres([]));
   }, []);
 
@@ -143,17 +131,6 @@ const Reports = () => {
               {error && <div className="error-message">{error}</div>}
             </div>
             
-            <div className="alerts-section">
-              <h3>Alerts</h3>
-              <div className="alert-list">
-                {alerts.length ? alerts.map((alert) => (
-                  <Link key={alert.type} to={`/reports/alerts/${alert.type}`} className={`alert-item alert-${alert.severity} alert-link`}>
-                    <strong>{alert.type === 'health' ? 'Growth/Health Risk' : alert.type === 'vaccination' ? 'Vaccination Due' : alert.type === 'nutrition' ? 'Nutrition Risk' : 'Low Attendance'}:</strong> {alert.message}
-                    <span className="alert-view-link">View students →</span>
-                  </Link>
-                )) : <p>No current alerts based on the saved records.</p>}
-              </div>
-            </div>
           </div>
           {report && <section className="report-document">
             <div className="report-document-header">

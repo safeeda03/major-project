@@ -12,6 +12,7 @@ const Sidebar = ({ role }) => {
       { name: 'Vaccination', path: '/vaccination' },
       { name: 'Attendance', path: '/attendance' },
       { name: 'OCR Upload', path: '/ocr' },
+      { name: 'Alerts', path: '/alerts' },
       { name: 'Reports', path: '/reports' },
     ],
     supervisor: [

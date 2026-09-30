@@ -30,7 +30,7 @@ const Alerts = () => {
 
   useEffect(() => { loadAlerts(); }, []);
 
-  return <div className="page"><Navbar /><div className="page-content"><Sidebar role="supervisor" /><main className="main-content">
+  return <div className="page"><Navbar /><div className="page-content"><Sidebar role="worker" /><main className="main-content">
     <div className="page-heading"><div><h2>Alerts & Notifications</h2><p>Live alerts calculated from saved health, nutrition, vaccination, and attendance records.</p></div><button className="submit-btn" type="button" onClick={loadAlerts} disabled={loading}>{loading ? 'Refreshing…' : 'Refresh alerts'}</button></div>
     {error && <div className="error-message">{error}</div>}
     {loading && <p>Loading live alerts…</p>}

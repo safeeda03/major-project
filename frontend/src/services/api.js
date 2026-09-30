@@ -75,6 +75,8 @@ export const healthAPI = {
 
 // Attendance API
 export const attendanceAPI = {
+  getDaily: (date) => request(`/attendance/daily/${date}`),
+  saveDaily: (date, attendance) => request('/attendance/daily', { method: 'PUT', body: JSON.stringify({ date, attendance }) }),
   getAll: () => request('/attendance'),
   create: (data) => request('/attendance', { method: 'POST', body: JSON.stringify(data) }),
   getByBeneficiary: (id) => request(`/attendance/beneficiary/${id}`),

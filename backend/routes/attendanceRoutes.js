@@ -7,8 +7,13 @@ const {
   updateAttendance,
   deleteAttendance,
   getAttendanceByBeneficiary,
-  getAttendanceByDate
+  getAttendanceByDate,
+  getDailyAttendance,
+  saveDailyAttendance
 } = require('../controllers/attendanceController');
+
+router.get('/daily/:date', getDailyAttendance);
+router.put('/daily', saveDailyAttendance);
 
 // Get attendance by beneficiary
 router.get('/beneficiary/:beneficiaryId', getAttendanceByBeneficiary);

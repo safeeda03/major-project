@@ -30,7 +30,7 @@ const AlertDetails = () => {
       <div className="page-content">
         <Sidebar role="worker" />
         <main className="main-content">
-          <Link className="back-link" to="/reports">← Back to Reports</Link>
+          <Link className="back-link" to="/alerts">← Back to Alerts</Link>
           {error && <div className="error-message">{error}</div>}
           {!data && !error && <p>Loading affected beneficiaries...</p>}
           {data && <div className="form-container records-container">
