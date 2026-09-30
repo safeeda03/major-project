@@ -8,7 +8,7 @@ router.post('/login', login);
 // Logout route
 router.post('/logout', logout);
 
-// Register route (admin only)
+// Register route
 router.post('/register', register);
 
 module.exports = router;

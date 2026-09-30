@@ -89,13 +89,6 @@ const seedData = async () => {
         phone: '9876543212',
         password: hashedPassword,
         role: 'parent'
-      },
-      {
-        user_id: 'USR004',
-        name: 'Admin User',
-        phone: '9876543213',
-        password: hashedPassword,
-        role: 'admin'
       }
     ]);
 
@@ -273,7 +266,6 @@ const seedData = async () => {
     console.log('Worker: 9876543210 / password123');
     console.log('Supervisor: 9876543211 / password123');
     console.log('Parent: 9876543212 / password123');
-    console.log('Admin: 9876543213 / password123');
 
   } catch (error) {
     console.error('Error seeding data:', error);

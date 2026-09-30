@@ -33,7 +33,7 @@ const Sidebar = ({ role }) => {
     ]
   };
 
-  const activeRole = user?.role === 'admin' ? 'supervisor' : (user?.role || role || 'worker');
+  const activeRole = user?.role || role || 'worker';
   const items = menuItems[activeRole] || menuItems.worker;
 
   return (

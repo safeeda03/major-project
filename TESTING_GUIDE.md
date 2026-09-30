@@ -79,18 +79,12 @@ After running the seed script, use these credentials to test:
 - Password: `password123`
 - Role: Parent
 
-### Admin Login
-- Phone: `9876543213`
-- Password: `password123`
-- Role: Admin
-
 ## Testing Checklist
 
 ### Authentication Testing
 - [ ] Login with worker credentials
 - [ ] Login with supervisor credentials
 - [ ] Login with parent credentials
-- [ ] Login with admin credentials
 - [ ] Test invalid credentials
 - [ ] Test logout functionality
 - [ ] Test role-based redirects
@@ -153,7 +147,7 @@ After running the seed script, use these credentials to test:
 - [ ] Verify data accuracy
 - [ ] Test verification workflow
 
-### GIS Map Testing (Supervisor/Admin only)
+### GIS Map Testing (Supervisor only)
 - [ ] View map with centre markers
 - [ ] Check risk level colors
 - [ ] Filter by region

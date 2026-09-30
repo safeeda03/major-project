@@ -14,7 +14,7 @@ const Navbar = () => {
   };
 
   const getDashboardPath = () => {
-    if (hasRole(['supervisor', 'admin'])) return '/supervisor-dashboard';
+    if (hasRole('supervisor')) return '/supervisor-dashboard';
     if (hasRole('parent')) return '/parent-dashboard';
     return '/worker-dashboard';
   };
@@ -26,10 +26,10 @@ const Navbar = () => {
       </div>
       {user && !isLoginPage && <div className="navbar-menu">
         <a href={getDashboardPath()}>Dashboard</a>
-        {hasRole(['worker', 'admin']) && <a href="/beneficiaries">Beneficiaries</a>}
-        {hasRole(['worker', 'supervisor', 'admin']) && <a href="/reports">Reports</a>}
-        {hasRole(['worker', 'parent', 'admin']) && <a href="/chatbot">Chatbot</a>}
-        {hasRole(['supervisor', 'admin']) && <a href="/map">GIS Map</a>}
+        {hasRole('worker') && <a href="/beneficiaries">Beneficiaries</a>}
+        {hasRole(['worker', 'supervisor']) && <a href="/reports">Reports</a>}
+        {hasRole(['worker', 'parent']) && <a href="/chatbot">Chatbot</a>}
+        {hasRole('supervisor') && <a href="/map">GIS Map</a>}
         <span className="user-info">Welcome, {user?.name || 'User'}</span>
         <button onClick={handleLogout} className="logout-btn">Logout</button>
       </div>}

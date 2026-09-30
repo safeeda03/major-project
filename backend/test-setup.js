@@ -8,7 +8,7 @@ async function createTestUsers() {
     console.log('Connected to MongoDB');
     
     // Clear existing test users
-    await User.deleteMany({ phone: /9876543210|9876543211|9876543212|9876543213/ });
+    await User.deleteMany({ phone: /9876543210|9876543211|9876543212/ });
     
     const users = [
       {
@@ -31,13 +31,6 @@ async function createTestUsers() {
         phone: '9876543212',
         password: 'password123',
         role: 'parent'
-      },
-      {
-        user_id: 'ADMIN001',
-        name: 'Test Admin',
-        phone: '9876543213',
-        password: 'password123',
-        role: 'admin'
       }
     ];
     
@@ -56,7 +49,6 @@ async function createTestUsers() {
     console.log('Worker: 9876543210 / password123');
     console.log('Supervisor: 9876543211 / password123');
     console.log('Parent: 9876543212 / password123');
-    console.log('Admin: 9876543213 / password123');
     
     process.exit(0);
   } catch (error) {

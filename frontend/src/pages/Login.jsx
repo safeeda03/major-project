@@ -34,8 +34,7 @@ const Login = () => {
       const roleDashboard = {
         worker: '/worker-dashboard',
         supervisor: '/supervisor-dashboard',
-        parent: '/parent-dashboard',
-        admin: '/supervisor-dashboard'
+        parent: '/parent-dashboard'
       };
       
       // Use the user role from login response
@@ -93,7 +92,6 @@ const Login = () => {
                   <option value="worker">Anganwadi Worker</option>
                   <option value="supervisor">Supervisor</option>
                   <option value="parent">Parent/Guardian</option>
-                  <option value="admin">Administrator</option>
                 </select>
               </div>
             </div>

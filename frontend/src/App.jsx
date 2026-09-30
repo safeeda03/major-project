@@ -30,97 +30,97 @@ function App() {
           <Route path="/" element={<Login />} />
           <Route path="/login" element={<Login />} />
           <Route path="/worker-dashboard" element={
-            <ProtectedRoute allowedRoles={['worker', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker']}>
               <WorkerDashboard />
             </ProtectedRoute>
           } />
           <Route path="/supervisor-dashboard" element={
-            <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+            <ProtectedRoute allowedRoles={['supervisor']}>
               <SupervisorDashboard />
             </ProtectedRoute>
           } />
           <Route path="/parent-dashboard" element={
-            <ProtectedRoute allowedRoles={['parent', 'admin']}>
+            <ProtectedRoute allowedRoles={['parent']}>
               <ParentDashboard />
             </ProtectedRoute>
           } />
           <Route path="/beneficiaries" element={
-            <ProtectedRoute allowedRoles={['worker', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker']}>
               <Beneficiary />
             </ProtectedRoute>
           } />
           <Route path="/beneficiaries/:id" element={
-            <ProtectedRoute allowedRoles={['worker', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker']}>
               <BeneficiaryDetails />
             </ProtectedRoute>
           } />
           <Route path="/child-profile" element={
-            <ProtectedRoute allowedRoles={['parent', 'admin']}>
+            <ProtectedRoute allowedRoles={['parent']}>
               <ChildProfile />
             </ProtectedRoute>
           } />
           <Route path="/recommendations" element={
-            <ProtectedRoute allowedRoles={['parent', 'admin']}>
+            <ProtectedRoute allowedRoles={['parent']}>
               <AlertsRecommendations />
             </ProtectedRoute>
           } />
           <Route path="/health" element={
-            <ProtectedRoute allowedRoles={['worker', 'parent', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker', 'parent']}>
               <Health />
             </ProtectedRoute>
           } />
           <Route path="/nutrition" element={
-            <ProtectedRoute allowedRoles={['worker', 'parent', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker', 'parent']}>
               <Nutrition />
             </ProtectedRoute>
           } />
           <Route path="/vaccination" element={
-            <ProtectedRoute allowedRoles={['worker', 'parent', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker', 'parent']}>
               <Vaccination />
             </ProtectedRoute>
           } />
           <Route path="/attendance" element={
-            <ProtectedRoute allowedRoles={['worker', 'parent', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker', 'parent']}>
               <Attendance />
             </ProtectedRoute>
           } />
           <Route path="/reports" element={
-            <ProtectedRoute allowedRoles={['worker', 'supervisor', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker', 'supervisor']}>
               <Reports />
             </ProtectedRoute>
           } />
           <Route path="/alerts" element={
-            <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+            <ProtectedRoute allowedRoles={['supervisor']}>
               <Alerts />
             </ProtectedRoute>
           } />
           <Route path="/statistics" element={
-            <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+            <ProtectedRoute allowedRoles={['supervisor']}>
               <Statistics />
             </ProtectedRoute>
           } />
           <Route path="/centres" element={
-            <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+            <ProtectedRoute allowedRoles={['supervisor']}>
               <Centres />
             </ProtectedRoute>
           } />
           <Route path="/reports/alerts/:type" element={
-            <ProtectedRoute allowedRoles={['worker', 'supervisor', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker', 'supervisor']}>
               <AlertDetails />
             </ProtectedRoute>
           } />
           <Route path="/chatbot" element={
-            <ProtectedRoute allowedRoles={['worker', 'parent', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker', 'parent']}>
               <Chatbot />
             </ProtectedRoute>
           } />
           <Route path="/map" element={
-            <ProtectedRoute allowedRoles={['supervisor', 'admin']}>
+            <ProtectedRoute allowedRoles={['supervisor']}>
               <Map />
             </ProtectedRoute>
           } />
           <Route path="/ocr" element={
-            <ProtectedRoute allowedRoles={['worker', 'admin']}>
+            <ProtectedRoute allowedRoles={['worker']}>
               <OCR />
             </ProtectedRoute>
           } />

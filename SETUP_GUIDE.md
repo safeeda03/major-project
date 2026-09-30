@@ -71,7 +71,6 @@ This will create test users with these credentials:
 - **Worker:** 9876543210 / password123
 - **Supervisor:** 9876543211 / password123  
 - **Parent:** 9876543212 / password123
-- **Admin:** 9876543213 / password123
 
 ### Step 3: Start Backend Server
 ```bash

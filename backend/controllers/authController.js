@@ -2,10 +2,16 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+const ALLOWED_ROLES = ['worker', 'supervisor', 'parent'];
+
 // Login controller
 exports.login = async (req, res) => {
   try {
     const { phone, password, role } = req.body;
+
+    if (!ALLOWED_ROLES.includes(role)) {
+      return res.status(403).json({ message: 'Unauthorized role' });
+    }
 
     // Find user by phone
     const user = await User.findOne({ phone });
@@ -56,10 +62,14 @@ exports.logout = async (req, res) => {
   }
 };
 
-// Register controller (for admin use)
+// Register controller
 exports.register = async (req, res) => {
   try {
     const { name, phone, password, role } = req.body;
+
+    if (!ALLOWED_ROLES.includes(role)) {
+      return res.status(400).json({ message: 'Role must be worker, supervisor, or parent' });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ phone });

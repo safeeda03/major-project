@@ -1,17 +1,18 @@
-# PoshanAI - Child Health & Nutrition Management System
+# PoshanAI - Mobile Child Health & Nutrition Management App
 
 ## Overview
-PoshanAI is a comprehensive health and nutrition management system designed for Anganwadi centres, workers, supervisors, and parents. It provides tools for tracking child health, nutrition, vaccination, and attendance records, along with AI-powered insights and GIS-based clustering.
+PoshanAI is a native Android app for Anganwadi centres, workers, supervisors, and parents. It provides phone-first tools for tracking child health, nutrition, vaccination, and attendance, with AI-powered insights and centre mapping. The `frontend/` folder is an optional browser dashboard; the primary user-facing product is in `mobile/`.
 
 ## Technology Stack
 
-### Frontend
-- **React.js** - UI Framework
-- **Vite** - Build Tool
-- **React Router** - Navigation
-- **Chart.js / Recharts** - Data Visualization
-- **Leaflet** - Maps
-- **Axios** - HTTP Client
+### Mobile app (primary)
+- **React Native** - Native Android/iOS UI
+- **React Navigation** - Stack and mobile bottom-tab navigation
+- **Native camera, maps and voice integrations**
+- **Axios** - API client
+
+### Browser dashboard (optional)
+- **React.js + Vite** - Browser interface
 
 ### Backend
 - **Node.js** - Runtime
@@ -31,7 +32,13 @@ PoshanAI is a comprehensive health and nutrition management system designed for 
 
 ```
 poshanai/
-├── frontend/
+├── mobile/                 # Primary React Native application
+│   ├── src/
+│   │   ├── screens/
+│   │   ├── services/
+│   │   └── App.js
+│   └── android/
+├── frontend/               # Optional browser dashboard
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── Navbar.jsx
@@ -113,11 +120,6 @@ poshanai/
 - Receive recommendations
 - Access child growth charts
 
-### Administrator
-- Manage users and centres
-- Oversee system data
-- Configure system settings
-
 ## Installation
 
 ### Prerequisites
@@ -134,7 +136,16 @@ cp .env.example .env
 npm run dev
 ```
 
-### Frontend Setup
+### Mobile App Setup (primary)
+```bash
+cd mobile
+npm install
+npm run android
+```
+
+Before running on Android, set the API address in `mobile/src/config.js`: use `10.0.2.2` for an Android emulator, or your computer's LAN IP address for a physical phone. See [mobile/README.md](mobile/README.md) for the complete mobile setup.
+
+### Optional Browser Dashboard
 ```bash
 cd frontend
 npm install
@@ -198,7 +209,7 @@ npm run dev
 ### Authentication
 - `POST /api/auth/login` - User login
 - `POST /api/auth/logout` - User logout
-- `POST /api/auth/register` - User registration (admin)
+- `POST /api/auth/register` - User registration
 
 ### Beneficiaries
 - `GET /api/beneficiaries` - Get all beneficiaries
@@ -258,7 +269,7 @@ npm run dev
   name: String,
   phone: String,
   password: String,
-  role: String // 'worker', 'supervisor', 'parent', 'admin'
+  role: String // 'worker', 'supervisor', 'parent'
 }
 ```
 

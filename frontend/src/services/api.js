@@ -20,8 +20,7 @@ const request = async (path, options = {}) => {
 const mockUsers = {
   '9876543210': { id: 'USR001', name: 'Rajesh Kumar', phone: '9876543210', role: 'worker' },
   '9876543211': { id: 'USR002', name: 'Sunita Devi', phone: '9876543211', role: 'supervisor' },
-  '9876543212': { id: 'USR003', name: 'Amit Sharma', phone: '9876543212', role: 'parent' },
-  '9876543213': { id: 'USR004', name: 'Admin User', phone: '9876543213', role: 'admin' }
+  '9876543212': { id: 'USR003', name: 'Amit Sharma', phone: '9876543212', role: 'parent' }
 };
 
 // Auth API

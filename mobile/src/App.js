@@ -20,13 +20,14 @@ import ChatbotScreen from './screens/ChatbotScreen';
 import OcrScreen from './screens/OcrScreen';
 import MapScreen from './screens/MapScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import MoreScreen from './screens/MoreScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const tabIcon = (route) => ({
   Dashboard: 'dashboard', Beneficiaries: 'people', Health: 'favorite', Chatbot: 'chat', OCR: 'document-scanner',
-  Centres: 'location-city', Map: 'map', Reports: 'assessment', Profile: 'account-circle',
+  Centres: 'location-city', Map: 'map', Reports: 'assessment', Profile: 'account-circle', More: 'more-horiz',
   Child: 'child-care', Vaccination: 'vaccines',
 }[route.name] || 'home');
 
@@ -34,6 +35,9 @@ const tabOptions = ({ route }) => ({
   headerShown: false,
   tabBarActiveTintColor: '#165C55',
   tabBarInactiveTintColor: '#6B7280',
+  tabBarHideOnKeyboard: true,
+  tabBarStyle: { height: 64, paddingTop: 6, paddingBottom: 7 },
+  tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
   tabBarIcon: ({ color, size }) => <Icon name={tabIcon(route)} size={size} color={color} />,
 });
 
@@ -42,9 +46,7 @@ function WorkerTabs() {
     <Tab.Screen name="Dashboard" component={WorkerDashboard} />
     <Tab.Screen name="Beneficiaries" component={BeneficiaryScreen} />
     <Tab.Screen name="Health" component={HealthScreen} />
-    <Tab.Screen name="OCR" component={OcrScreen} />
-    <Tab.Screen name="Chatbot" component={ChatbotScreen} />
-    <Tab.Screen name="Profile" component={ProfileScreen} />
+    <Tab.Screen name="More" component={MoreScreen} />
   </Tab.Navigator>;
 }
 
@@ -53,8 +55,7 @@ function SupervisorTabs() {
     <Tab.Screen name="Dashboard" component={SupervisorDashboard} />
     <Tab.Screen name="Centres" component={BeneficiaryScreen} />
     <Tab.Screen name="Map" component={MapScreen} />
-    <Tab.Screen name="Reports" component={ReportsScreen} />
-    <Tab.Screen name="Profile" component={ProfileScreen} />
+    <Tab.Screen name="More" component={MoreScreen} />
   </Tab.Navigator>;
 }
 
@@ -63,8 +64,7 @@ function ParentTabs() {
     <Tab.Screen name="Dashboard" component={ParentDashboard} />
     <Tab.Screen name="Child" component={BeneficiaryScreen} />
     <Tab.Screen name="Health" component={HealthScreen} />
-    <Tab.Screen name="Vaccination" component={VaccinationScreen} />
-    <Tab.Screen name="Profile" component={ProfileScreen} />
+    <Tab.Screen name="More" component={MoreScreen} />
   </Tab.Navigator>;
 }
 
@@ -83,6 +83,9 @@ function AppNavigator() {
         <Stack.Screen name="Attendance" component={AttendanceScreen} />
         <Stack.Screen name="Reports" component={ReportsScreen} />
         <Stack.Screen name="Map" component={MapScreen} />
+        <Stack.Screen name="OCR" component={OcrScreen} />
+        <Stack.Screen name="Chatbot" component={ChatbotScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
       </> : <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />}
     </Stack.Navigator>
   </NavigationContainer>;
