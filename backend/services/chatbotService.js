@@ -8,7 +8,38 @@ Give advice that someone can use at home or during parent counselling. For nutri
 
 Organise longer answers with short headings and bullet points. Prefer practical examples over phrases like "give a balanced diet". Never diagnose a disease or prescribe medicine. Explain when to contact an Anganwadi worker, ASHA/health worker, or doctor, and mention urgent care for danger signs. Do not invent official schemes, citations, statistics, or beneficiary data. Do not ask for passwords, API keys, Aadhaar numbers, or other unnecessary sensitive information. Reply only in the user's language and return only the final answer without hidden reasoning or thinking markers.`;
 
+const LOCAL_KNOWLEDGE_CONTEXT = `General PoshanAI reference context:
+- Common foods: rice, ragi, dal, green gram, egg, fish, chicken, milk, curd, banana, seasonal vegetables, and healthy fats such as groundnut or sesame paste.
+- Practical pattern: 3 meals and 2 to 3 nutritious snacks, with age-appropriate texture, clean preparation, and responsive feeding.
+- Monitoring: record weight and height on the Anganwadi growth chart and refer persistent poor growth or danger signs to a health worker.
+Use this as guidance, not as a diagnosis or a replacement for an individual health assessment.`;
+
 class ChatbotService {
+  static async getDatasetContext() {
+    try {
+      const NutritionRecord = require('../models/NutritionRecord');
+      const HealthRecord = require('../models/HealthRecord');
+      if (NutritionRecord.db.readyState !== 1) return LOCAL_KNOWLEDGE_CONTEXT;
+
+      const [nutritionRecords, healthRecords] = await Promise.all([
+        NutritionRecord.find().sort({ date: -1 }).limit(12).lean().exec(),
+        HealthRecord.find().sort({ date: -1 }).limit(12).lean().exec(),
+      ]);
+      const records = [
+        ...nutritionRecords.map(({ beneficiary_id, nutrition_status, meals, recommendations, date }) => ({
+          type: 'nutrition', beneficiary_id, nutrition_status, meals, recommendations, date,
+        })),
+        ...healthRecords.map(({ beneficiary_id, height, weight, health_status, date }) => ({
+          type: 'health', beneficiary_id, height, weight, health_status, date,
+        })),
+      ];
+      return `${LOCAL_KNOWLEDGE_CONTEXT}\nRecent project records (use only when relevant; do not reveal beneficiary IDs):\n${JSON.stringify(records)}`;
+    } catch (error) {
+      console.warn('Could not load chatbot dataset context:', error.message);
+      return LOCAL_KNOWLEDGE_CONTEXT;
+    }
+  }
+
   static fallbackResponse(message, language) {
     if (language === 'ml-IN') {
       // Keep a useful local answer for ordinary Malayalam nutrition questions when the model falls back.
@@ -130,8 +161,9 @@ Monitoring and referral
     const languageInstruction = selectedLanguage === 'ml-IN'
       ? 'LANGUAGE RULE: The user wrote Malayalam or selected Malayalam. Reply entirely in natural Malayalam script. Do not reply in English, do not transliterate Malayalam, and do not include English explanations. Use short, clear Malayalam sentences.'
       : 'LANGUAGE RULE: Reply entirely in natural English. Do not include Malayalam or another language.';
+    const datasetContext = await this.getDatasetContext();
     const messages = [
-      { role: 'system', content: `${ASSISTANT_INSTRUCTIONS}\n${languageInstruction}\nPreferred response language: ${selectedLanguage}.` },
+      { role: 'system', content: `${ASSISTANT_INSTRUCTIONS}\n${languageInstruction}\nPreferred response language: ${selectedLanguage}.\n\n${datasetContext}` },
       ...this.sanitizeHistory(history),
       { role: 'user', content: `${message}\n\n/no_think` },
     ];
@@ -145,8 +177,8 @@ Monitoring and referral
           model,
           messages,
           stream: false,
-          think: false,
-          options: { num_predict: 768, temperature: 0.2 },
+          think: true,
+          options: { num_predict: 2048, temperature: 0.35 },
         }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
