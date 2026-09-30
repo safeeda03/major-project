@@ -73,6 +73,7 @@ const seedData = async () => {
         user_id: 'USR001',
         name: 'Rajesh Kumar',
         phone: '9876543210',
+        email: 'anganwadiworker@gmail.com',
         password: hashedPassword,
         role: 'worker'
       },
@@ -80,6 +81,7 @@ const seedData = async () => {
         user_id: 'USR002',
         name: 'Sunita Devi',
         phone: '9876543211',
+        email: 'supervisor@gmail.com',
         password: hashedPassword,
         role: 'supervisor'
       },
@@ -87,6 +89,7 @@ const seedData = async () => {
         user_id: 'USR003',
         name: 'Amit Sharma',
         phone: '9876543212',
+        email: 'fimsha@gmail.com',
         password: hashedPassword,
         role: 'parent'
       }
@@ -264,8 +267,11 @@ const seedData = async () => {
     
     console.log('\nTest Login Credentials:');
     console.log('Worker: 9876543210 / password123');
+    console.log('        anganwadiworker@gmail.com / password123');
     console.log('Supervisor: 9876543211 / password123');
+    console.log('            supervisor@gmail.com / password123');
     console.log('Parent: 9876543212 / password123');
+    console.log('        fimsha@gmail.com / password123');
 
   } catch (error) {
     console.error('Error seeding data:', error);

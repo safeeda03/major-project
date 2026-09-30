@@ -7,14 +7,20 @@ const ALLOWED_ROLES = ['worker', 'supervisor', 'parent'];
 // Login controller
 exports.login = async (req, res) => {
   try {
-    const { phone, password, role } = req.body;
+    const { phone, email, identifier, password, role } = req.body;
+    const loginIdentifier = String(identifier || email || phone || '').trim();
 
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(403).json({ message: 'Unauthorized role' });
     }
 
-    // Find user by phone
-    const user = await User.findOne({ phone });
+    // Find user by phone number or email address.
+    const user = await User.findOne({
+      $or: [
+        { phone: loginIdentifier },
+        { email: loginIdentifier.toLowerCase() }
+      ]
+    });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -45,6 +51,7 @@ exports.login = async (req, res) => {
         user_id: user.user_id,
         name: user.name,
         phone: user.phone,
+        email: user.email,
         role: user.role
       }
     });
@@ -65,7 +72,7 @@ exports.logout = async (req, res) => {
 // Register controller
 exports.register = async (req, res) => {
   try {
-    const { name, phone, password, role } = req.body;
+    const { name, phone, email, password, role } = req.body;
 
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Role must be worker, supervisor, or parent' });
@@ -84,6 +91,7 @@ exports.register = async (req, res) => {
     const user = new User({
       name,
       phone,
+      email,
       password: hashedPassword,
       role
     });
@@ -96,6 +104,7 @@ exports.register = async (req, res) => {
         id: user._id,
         name: user.name,
         phone: user.phone,
+        email: user.email,
         role: user.role
       }
     });

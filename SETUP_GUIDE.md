@@ -69,8 +69,11 @@ node test-setup.js
 
 This will create test users with these credentials:
 - **Worker:** 9876543210 / password123
+- **Worker email:** anganwadiworker@gmail.com / password123
 - **Supervisor:** 9876543211 / password123  
+- **Supervisor email:** supervisor@gmail.com / password123
 - **Parent:** 9876543212 / password123
+- **Parent email:** fimsha@gmail.com / password123
 
 ### Step 3: Start Backend Server
 ```bash

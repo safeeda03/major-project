@@ -15,6 +15,7 @@ async function createTestUsers() {
         user_id: 'WORKER001',
         name: 'Test Worker',
         phone: '9876543210',
+        email: 'anganwadiworker@gmail.com',
         password: 'password123',
         role: 'worker'
       },
@@ -22,6 +23,7 @@ async function createTestUsers() {
         user_id: 'SUP001',
         name: 'Test Supervisor',
         phone: '9876543211',
+        email: 'supervisor@gmail.com',
         password: 'password123',
         role: 'supervisor'
       },
@@ -29,6 +31,7 @@ async function createTestUsers() {
         user_id: 'PARENT001',
         name: 'Test Parent',
         phone: '9876543212',
+        email: 'fimsha@gmail.com',
         password: 'password123',
         role: 'parent'
       }
@@ -47,8 +50,11 @@ async function createTestUsers() {
     console.log('\nTest users created successfully!');
     console.log('Login credentials:');
     console.log('Worker: 9876543210 / password123');
+    console.log('        anganwadiworker@gmail.com / password123');
     console.log('Supervisor: 9876543211 / password123');
+    console.log('            supervisor@gmail.com / password123');
     console.log('Parent: 9876543212 / password123');
+    console.log('        fimsha@gmail.com / password123');
     
     process.exit(0);
   } catch (error) {

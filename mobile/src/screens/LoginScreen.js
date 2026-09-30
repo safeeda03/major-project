@@ -13,23 +13,23 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
-  const [phone, setPhone] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('worker');
   const [loading, setLoading] = useState(false);
   const { signIn } = useAuth();
 
   const handleLogin = async () => {
-    if (!phone || !password) {
+    if (!identifier || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
     setLoading(true);
     try {
-      await signIn({ phone, password, role });
+      await signIn({ identifier, password, role });
     } catch (error) {
-      Alert.alert('Unable to sign in', error.response?.data?.message || 'Check your phone number, password, and API connection.');
+      Alert.alert('Unable to sign in', error.response?.data?.message || 'Check your phone number or email, password, and API connection.');
     } finally {
       setLoading(false);
     }
@@ -50,14 +50,14 @@ const LoginScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.formContainer}>
-          <Text style={styles.label}>Phone Number</Text>
+          <Text style={styles.label}>Phone Number or Email</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter phone number"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            maxLength={10}
+            placeholder="Enter phone number or email"
+            value={identifier}
+            onChangeText={setIdentifier}
+            keyboardType="email-address"
+            autoCapitalize="none"
           />
 
           <Text style={styles.label}>Password</Text>

@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    phone: '',
+    identifier: '',
     password: '',
     role: 'worker'
   });
@@ -55,16 +55,16 @@ const Login = () => {
           {location.state?.message && <div className="success-message login-status-message" role="status">{location.state.message}</div>}
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>Phone Number</label>
+              <label>Phone Number or Email</label>
               <div className="login-input-wrap">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.5 15.5 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11.4 11.4 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17.97 17.97 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.4 11.4 0 0 0 .57 3.57 1 1 0 0 1-.25 1z" /></svg>
                 <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
+                  type="text"
+                  name="identifier"
+                  value={formData.identifier}
                   onChange={handleChange}
-                  placeholder="Enter your phone number"
-                  autoComplete="tel"
+                  placeholder="Enter your phone number or email"
+                  autoComplete="username"
                   required
                 />
               </div>

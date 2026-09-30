@@ -66,16 +66,19 @@ After running the seed script, use these credentials to test:
 
 ### Worker Login
 - Phone: `9876543210`
+- Email: `anganwadiworker@gmail.com`
 - Password: `password123`
 - Role: Worker
 
 ### Supervisor Login
 - Phone: `9876543211`
+- Email: `supervisor@gmail.com`
 - Password: `password123`
 - Role: Supervisor
 
 ### Parent Login
 - Phone: `9876543212`
+- Email: `fimsha@gmail.com`
 - Password: `password123`
 - Role: Parent
 
