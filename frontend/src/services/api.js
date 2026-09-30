@@ -4,8 +4,9 @@ const API_BASE_URL = '/api';
 const request = async (path, options = {}) => {
   let response;
   try {
+    const token = localStorage.getItem('token');
     response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) },
       ...options,
     });
   } catch {
@@ -16,35 +17,10 @@ const request = async (path, options = {}) => {
   return data;
 };
 
-// Mock login for testing without database
-const mockUsers = {
-  '9876543210': { id: 'USR001', name: 'Rajesh Kumar', phone: '9876543210', email: 'anganwadiworker@gmail.com', role: 'worker' },
-  'anganwadiworker@gmail.com': { id: 'USR001', name: 'Rajesh Kumar', phone: '9876543210', email: 'anganwadiworker@gmail.com', role: 'worker' },
-  '9876543211': { id: 'USR002', name: 'Sunita Devi', phone: '9876543211', email: 'supervisor@gmail.com', role: 'supervisor' },
-  'supervisor@gmail.com': { id: 'USR002', name: 'Sunita Devi', phone: '9876543211', email: 'supervisor@gmail.com', role: 'supervisor' },
-  '9876543212': { id: 'USR003', name: 'Amit Sharma', phone: '9876543212', email: 'fimsha@gmail.com', role: 'parent' },
-  'fimsha@gmail.com': { id: 'USR003', name: 'Amit Sharma', phone: '9876543212', email: 'fimsha@gmail.com', role: 'parent' }
-};
-
 // Auth API
 export const authAPI = {
-  login: async (credentials) => {
-    // Mock login for testing without database
-    const { identifier, phone, password, role } = credentials;
-    const loginIdentifier = (identifier || phone || '').trim().toLowerCase();
-    
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    if (mockUsers[loginIdentifier] && password === 'password123' && mockUsers[loginIdentifier].role === role) {
-      return {
-        token: 'mock-jwt-token-' + Date.now(),
-        user: mockUsers[loginIdentifier]
-      };
-    }
-    
-    throw new Error('Invalid credentials');
-  },
+  login: (credentials) => request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
+  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   
   logout: async () => {
     const response = await fetch(`${API_BASE_URL}/auth/logout`, {

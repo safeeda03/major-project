@@ -31,6 +31,9 @@ const userSchema = new mongoose.Schema({
     enum: ['worker', 'supervisor', 'parent'],
     required: true
   },
+  workerId: { type: String, trim: true, sparse: true, unique: true },
+  centreId: { type: String, trim: true },
+  beneficiaryId: { type: String, trim: true, sparse: true, unique: true },
   createdAt: {
     type: Date,
     default: Date.now

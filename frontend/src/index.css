@@ -527,6 +527,10 @@ body {
   background: linear-gradient(100deg, #1877d5, #287ed5);
 }
 
+.auth-mode-prompt { margin-top: 1.25rem; color: #7b8794; font-size: 0.85rem; text-align: center; }
+.auth-mode-toggle { padding: 0; border: 0; background: transparent; color: #1877c9; font: inherit; text-decoration: underline; cursor: pointer; }
+.auth-mode-toggle:hover { color: #125d9a; }
+
 @media (max-width: 520px) {
   .login-container {
     min-height: calc(100vh - 78px);

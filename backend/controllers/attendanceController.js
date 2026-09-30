@@ -1,5 +1,6 @@
 const Attendance = require('../models/Attendance');
 const Beneficiary = require('../models/Beneficiary');
+const { getScopedBeneficiaryIds, canAccessBeneficiary } = require('../middleware/auth');
 
 const parseAttendanceDate = (value) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return null;
@@ -13,8 +14,9 @@ exports.getDailyAttendance = async (req, res) => {
   try {
     const date = parseAttendanceDate(req.params.date);
     if (!date) return res.status(400).json({ message: 'Date must be a valid YYYY-MM-DD date.' });
+    if (req.user.role === 'worker' && !req.user.centreId) return res.status(403).json({ message: 'Your account is not assigned to a centre.' });
     const [children, records] = await Promise.all([
-      Beneficiary.find({ beneficiary_type: 'child' }).sort({ name: 1 }).lean(),
+      Beneficiary.find({ beneficiary_type: 'child', ...(req.user.role === 'worker' ? { anganwadi_id: req.user.centreId } : req.user.role === 'parent' ? { beneficiary_id: req.user.beneficiaryId } : {}) }).sort({ name: 1 }).lean(),
       Attendance.find({ date: getDayRange(date) }).lean()
     ]);
     const byBeneficiary = new Map(records.map((record) => [record.beneficiary_id, record]));
@@ -39,7 +41,8 @@ exports.saveDailyAttendance = async (req, res) => {
     if (childIds.length !== rows.length || rows.some((row) => !row?.beneficiary_id || !['present', 'absent'].includes(row.status) || !reasons.includes(row.absence_reason || ''))) {
       return res.status(400).json({ message: 'Each child needs a valid, unique attendance status and absence reason.' });
     }
-    const children = await Beneficiary.find({ beneficiary_id: { $in: childIds }, beneficiary_type: 'child' }).select('beneficiary_id').lean();
+    if (req.user.role !== 'worker' || !req.user.centreId) return res.status(403).json({ message: 'Only an assigned Anganwadi worker can save attendance.' });
+    const children = await Beneficiary.find({ beneficiary_id: { $in: childIds }, beneficiary_type: 'child', anganwadi_id: req.user.centreId }).select('beneficiary_id').lean();
     if (children.length !== childIds.length) return res.status(400).json({ message: 'Attendance can only be saved for registered children.' });
 
     const existing = await Attendance.find({ beneficiary_id: { $in: childIds }, date: getDayRange(date) }).select('_id beneficiary_id').lean();
@@ -66,7 +69,8 @@ exports.saveDailyAttendance = async (req, res) => {
 // Get all attendance records
 exports.getAllAttendance = async (req, res) => {
   try {
-    const attendance = await Attendance.find();
+    const ids = await getScopedBeneficiaryIds(req.user);
+    const attendance = await Attendance.find(ids ? { beneficiary_id: { $in: ids } } : {});
     res.json(attendance);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -80,6 +84,8 @@ exports.getAttendanceById = async (req, res) => {
     if (!attendance) {
       return res.status(404).json({ message: 'Attendance record not found' });
     }
+    const child = await Beneficiary.findOne({ beneficiary_id: attendance.beneficiary_id });
+    if (!canAccessBeneficiary(req.user, child)) return res.status(403).json({ message: 'You cannot access this attendance record.' });
     res.json(attendance);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -94,8 +100,9 @@ exports.createAttendance = async (req, res) => {
     if (!beneficiary_id || !parsedDate || Number.isNaN(parsedDate.getTime()) || !['present', 'absent', 'half-day'].includes(status)) {
       return res.status(400).json({ message: 'A registered beneficiary, valid date, and valid attendance status are required.' });
     }
-    const child = await Beneficiary.findOne({ beneficiary_id, beneficiary_type: 'child' }).select('_id');
+    const child = await Beneficiary.findOne({ beneficiary_id, beneficiary_type: 'child' });
     if (!child) return res.status(400).json({ message: 'Attendance can only be recorded for a registered child.' });
+    if (req.user.role !== 'worker' || !canAccessBeneficiary(req.user, child)) return res.status(403).json({ message: 'This child does not belong to your centre.' });
     parsedDate.setUTCHours(0, 0, 0, 0);
     const attendance = await Attendance.findOneAndUpdate(
       { beneficiary_id, date: getDayRange(parsedDate) },
@@ -112,6 +119,10 @@ exports.createAttendance = async (req, res) => {
 exports.updateAttendance = async (req, res) => {
   try {
     const { beneficiary_id, date, status } = req.body;
+    const current = await Attendance.findById(req.params.id);
+    const child = current && await Beneficiary.findOne({ beneficiary_id: current.beneficiary_id });
+    if (!current) return res.status(404).json({ message: 'Attendance record not found' });
+    if (req.user.role !== 'worker' || !canAccessBeneficiary(req.user, child)) return res.status(403).json({ message: 'This attendance record is outside your centre.' });
 
     const attendance = await Attendance.findByIdAndUpdate(
       req.params.id,
@@ -135,6 +146,10 @@ exports.updateAttendance = async (req, res) => {
 // Delete attendance record
 exports.deleteAttendance = async (req, res) => {
   try {
+    const current = await Attendance.findById(req.params.id);
+    const child = current && await Beneficiary.findOne({ beneficiary_id: current.beneficiary_id });
+    if (!current) return res.status(404).json({ message: 'Attendance record not found' });
+    if (req.user.role !== 'worker' || !canAccessBeneficiary(req.user, child)) return res.status(403).json({ message: 'This attendance record is outside your centre.' });
     const attendance = await Attendance.findByIdAndDelete(req.params.id);
 
     if (!attendance) {
@@ -150,6 +165,8 @@ exports.deleteAttendance = async (req, res) => {
 // Get attendance by beneficiary
 exports.getAttendanceByBeneficiary = async (req, res) => {
   try {
+    const ids = await getScopedBeneficiaryIds(req.user);
+    if (ids && !ids.includes(req.params.beneficiaryId)) return res.status(403).json({ message: 'You cannot access records for this beneficiary.' });
     const attendance = await Attendance.find({ beneficiary_id: req.params.beneficiaryId });
     res.json(attendance);
   } catch (error) {
@@ -161,7 +178,8 @@ exports.getAttendanceByBeneficiary = async (req, res) => {
 exports.getAttendanceByDate = async (req, res) => {
   try {
     const { date } = req.params;
-    const attendance = await Attendance.find({ date: new Date(date) });
+    const ids = await getScopedBeneficiaryIds(req.user);
+    const attendance = await Attendance.find({ date: new Date(date), ...(ids ? { beneficiary_id: { $in: ids } } : {}) });
     res.json(attendance);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

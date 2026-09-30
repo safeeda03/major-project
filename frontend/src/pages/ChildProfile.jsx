@@ -62,13 +62,9 @@ export default function ChildProfile() {
       <h3>{child.name}</h3><p className="child-beneficiary-id">Beneficiary ID: <strong>{child.beneficiary_id}</strong></p>
       <div className="child-profile-details"><div><span>Date of birth</span><strong>{formatDate(child.dob)}</strong></div><div><span>Gender</span><strong>{child.gender}</strong></div><div><span>Anganwadi centre</span><strong>{child.anganwadi_id}</strong></div><div><span>Contact</span><strong>{child.contact_phone || '—'}</strong></div><div><span>Notes</span><strong>{child.notes || '—'}</strong></div></div>
       <button className="submit-btn child-profile-edit" type="button" onClick={() => setEditing(true)}>Edit Profile</button>
-    </div> : <div className="form-container"><h3>{child ? 'Edit Child Profile' : 'Add Your Child'}</h3><p>{child ? 'Update your child’s details or profile photo.' : 'Your parent account is linked automatically, and a beneficiary ID is generated after saving.'}</p>
+    </div> : !child ? <div className="form-container"><h3>No linked child profile</h3><p>Create a parent account using the Beneficiary ID provided by your Anganwadi worker. Your child profile will appear here automatically.</p></div> : <div className="form-container"><h3>Edit Child Profile</h3><p>Update your child’s contact details or profile photo.</p>
       <form onSubmit={submit}>
         <div className="form-group"><label>Profile picture</label><input type="file" accept="image/*" onChange={selectPhoto} />{profile.profile_photo && <img className="photo-preview" src={profile.profile_photo} alt="Profile preview" />}</div>
-        <div className="form-group"><label>Child’s full name</label><input name="name" value={profile.name} onChange={change} required /></div>
-        <div className="form-group"><label>Date of birth</label><input type="date" name="dob" value={profile.dob} onChange={change} max={new Date().toISOString().split('T')[0]} required /></div>
-        <div className="form-group"><label>Gender</label><select name="gender" value={profile.gender} onChange={change} required><option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option></select></div>
-        <div className="form-group"><label>Anganwadi centre ID</label><input name="anganwadi_id" value={profile.anganwadi_id} onChange={change} placeholder="e.g. ANG001" required /></div>
         <div className="form-group"><label>Contact phone (optional)</label><input type="tel" name="contact_phone" value={profile.contact_phone} onChange={change} /></div>
         <div className="form-group"><label>Notes or medical information (optional)</label><textarea name="notes" value={profile.notes} onChange={change} /></div>
         <button className="submit-btn" disabled={busy}>{busy ? 'Saving...' : child ? 'Save Changes' : 'Create Child Profile'}</button>{child && <button className="secondary-btn" type="button" onClick={cancelEdit}>Cancel</button>}

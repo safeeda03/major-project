@@ -1,9 +1,11 @@
 const Vaccination = require('../models/Vaccination');
+const { getScopedBeneficiaryIds } = require('../middleware/auth');
 
 // Get all vaccination records
 exports.getAllVaccinations = async (req, res) => {
   try {
-    const vaccinations = await Vaccination.find();
+    const ids = await getScopedBeneficiaryIds(req.user);
+    const vaccinations = await Vaccination.find(ids ? { beneficiary_id: { $in: ids } } : {});
     res.json(vaccinations);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -27,6 +29,8 @@ exports.getVaccinationById = async (req, res) => {
 exports.createVaccination = async (req, res) => {
   try {
     const { beneficiary_id, vaccine, date, next_due_date, completed } = req.body;
+    const ids = await getScopedBeneficiaryIds(req.user);
+    if (!req.user.centreId || !ids.includes(beneficiary_id)) return res.status(403).json({ message: 'This child does not belong to your centre.' });
 
     const vaccination = new Vaccination({
       beneficiary_id,
@@ -52,6 +56,11 @@ exports.updateVaccination = async (req, res) => {
   try {
     const { beneficiary_id, vaccine, date, next_due_date, completed } = req.body;
 
+    const current = await Vaccination.findById(req.params.id);
+    const ids = await getScopedBeneficiaryIds(req.user);
+    if (!current) return res.status(404).json({ message: 'Vaccination record not found' });
+    if (req.user.role !== 'supervisor' && !ids.includes(current.beneficiary_id)) return res.status(403).json({ message: 'This record is outside your access.' });
+    if (req.user.role === 'worker' && !ids.includes(beneficiary_id)) return res.status(403).json({ message: 'This child does not belong to your centre.' });
     const vaccination = await Vaccination.findByIdAndUpdate(
       req.params.id,
       { beneficiary_id, vaccine, date, next_due_date, completed },
@@ -74,6 +83,10 @@ exports.updateVaccination = async (req, res) => {
 // Mark a due vaccination as completed. Completed vaccinations are excluded from due alerts.
 exports.markVaccinationCompleted = async (req, res) => {
   try {
+    const current = await Vaccination.findById(req.params.id);
+    const ids = await getScopedBeneficiaryIds(req.user);
+    if (!current) return res.status(404).json({ message: 'Vaccination record not found' });
+    if (req.user.role !== 'supervisor' && !ids.includes(current.beneficiary_id)) return res.status(403).json({ message: 'This record is outside your access.' });
     const vaccination = await Vaccination.findByIdAndUpdate(
       req.params.id,
       { completed: true },
@@ -93,6 +106,10 @@ exports.markVaccinationCompleted = async (req, res) => {
 // Restore a completed vaccination to due status if it was marked done by mistake.
 exports.markVaccinationIncomplete = async (req, res) => {
   try {
+    const current = await Vaccination.findById(req.params.id);
+    const ids = await getScopedBeneficiaryIds(req.user);
+    if (!current) return res.status(404).json({ message: 'Vaccination record not found' });
+    if (req.user.role !== 'supervisor' && !ids.includes(current.beneficiary_id)) return res.status(403).json({ message: 'This record is outside your access.' });
     const vaccination = await Vaccination.findByIdAndUpdate(
       req.params.id,
       { completed: false },
@@ -112,6 +129,10 @@ exports.markVaccinationIncomplete = async (req, res) => {
 // Delete vaccination record
 exports.deleteVaccination = async (req, res) => {
   try {
+    const current = await Vaccination.findById(req.params.id);
+    const ids = await getScopedBeneficiaryIds(req.user);
+    if (!current) return res.status(404).json({ message: 'Vaccination record not found' });
+    if (req.user.role !== 'supervisor' && !ids.includes(current.beneficiary_id)) return res.status(403).json({ message: 'This record is outside your access.' });
     const vaccination = await Vaccination.findByIdAndDelete(req.params.id);
 
     if (!vaccination) {
@@ -127,6 +148,8 @@ exports.deleteVaccination = async (req, res) => {
 // Get vaccinations by beneficiary
 exports.getVaccinationsByBeneficiary = async (req, res) => {
   try {
+    const ids = await getScopedBeneficiaryIds(req.user);
+    if (ids && !ids.includes(req.params.beneficiaryId)) return res.status(403).json({ message: 'You cannot access records for this beneficiary.' });
     const vaccinations = await Vaccination.find({ beneficiary_id: req.params.beneficiaryId });
     res.json(vaccinations);
   } catch (error) {
@@ -137,7 +160,9 @@ exports.getVaccinationsByBeneficiary = async (req, res) => {
 // Get every outstanding vaccination, including upcoming due dates, for the dashboard.
 exports.getPendingVaccinations = async (req, res) => {
   try {
+    const ids = await getScopedBeneficiaryIds(req.user);
     const pendingVaccinations = await Vaccination.find({
+      ...(ids ? { beneficiary_id: { $in: ids } } : {}),
       completed: { $ne: true },
       next_due_date: { $exists: true, $ne: null }
     }).sort({ next_due_date: 1 });
@@ -151,7 +176,9 @@ exports.getPendingVaccinations = async (req, res) => {
 exports.getDueVaccinations = async (req, res) => {
   try {
     const today = new Date();
+    const ids = await getScopedBeneficiaryIds(req.user);
     const dueVaccinations = await Vaccination.find({
+      ...(ids ? { beneficiary_id: { $in: ids } } : {}),
       next_due_date: { $lte: today },
       completed: { $ne: true }
     });

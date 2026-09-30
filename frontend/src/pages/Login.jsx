@@ -2,13 +2,15 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../context/AuthContext';
+import { authAPI } from '../services/api';
 
 const Login = () => {
   const [formData, setFormData] = useState({
     identifier: '',
     password: '',
-    role: 'worker'
+    role: 'worker', name: '', email: '', phone: '', confirmPassword: '', workerId: '', centreId: '', beneficiaryId: ''
   });
+  const [mode, setMode] = useState('login');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -27,7 +29,15 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    const result = await login(formData);
+    let result;
+    try {
+      if (mode === 'register') await authAPI.register(formData);
+      result = await login(mode === 'login'
+        ? { identifier: formData.identifier, password: formData.password }
+        : { identifier: formData.email, password: formData.password });
+    } catch (err) {
+      result = { success: false, message: err.message };
+    }
     
     if (result.success) {
       // Redirect based on role
@@ -51,11 +61,20 @@ const Login = () => {
       <Navbar />
       <div className="login-container">
         <div className="login-box">
-          <h2>PoshanAI Login</h2>
+          <h2>{mode === 'login' ? 'PoshanAI Login' : 'Create Account'}</h2>
           {location.state?.message && <div className="success-message login-status-message" role="status">{location.state.message}</div>}
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label>Phone Number or Email</label>
+              {mode === 'register' && <>
+                <div className="form-group"><label>Account type</label><select name="role" value={formData.role} onChange={handleChange}><option value="supervisor">Supervisor</option><option value="worker">Anganwadi Worker</option><option value="parent">Parent</option></select></div>
+                <div className="form-group"><label>Full Name</label><input name="name" value={formData.name} onChange={handleChange} autoComplete="name" required /></div>
+                <div className="form-group"><label>Email</label><input type="email" name="email" value={formData.email} onChange={handleChange} autoComplete="email" required /></div>
+                <div className="form-group"><label>Phone Number</label><input type="tel" name="phone" value={formData.phone} onChange={handleChange} autoComplete="tel" required /></div>
+                {formData.role === 'worker' && <><div className="form-group"><label>Anganwadi Worker ID</label><input name="workerId" value={formData.workerId} onChange={handleChange} required /></div><div className="form-group"><label>Centre ID</label><input name="centreId" value={formData.centreId} onChange={handleChange} required /></div></>}
+                {formData.role === 'parent' && <div className="form-group"><label>Beneficiary ID</label><input name="beneficiaryId" value={formData.beneficiaryId} onChange={handleChange} required /></div>}
+              </>}
+              {mode === 'login' && <label>Email or Phone Number</label>}
+              {mode === 'login' && <>
               <div className="login-input-wrap">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.5 15.5 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.24 11.4 11.4 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17.97 17.97 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.4 11.4 0 0 0 .57 3.57 1 1 0 0 1-.25 1z" /></svg>
                 <input
@@ -68,6 +87,7 @@ const Login = () => {
                   required
                 />
               </div>
+              </>}
             </div>
             <div className="form-group">
               <label>Password</label>
@@ -80,26 +100,23 @@ const Login = () => {
                   onChange={handleChange}
                   placeholder="Enter your password"
                   autoComplete="current-password"
+                  minLength={mode === 'register' ? 8 : undefined}
                   required
                 />
               </div>
             </div>
-            <div className="form-group">
-              <label>Role</label>
-              <div className="login-input-wrap login-select-wrap">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.42 0-8 2.24-8 5v2h16v-2c0-2.76-3.58-5-8-5Zm-6 5c.58-1.4 2.9-3 6-3s5.42 1.6 6 3Z" /></svg>
-                <select name="role" value={formData.role} onChange={handleChange}>
-                  <option value="worker">Anganwadi Worker</option>
-                  <option value="supervisor">Supervisor</option>
-                  <option value="parent">Parent/Guardian</option>
-                </select>
-              </div>
-            </div>
+            {mode === 'register' && <div className="form-group"><label>Confirm Password</label><input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} autoComplete="new-password" required /></div>}
             <button type="submit" className="login-btn" disabled={loading}>
-              {loading ? 'Logging in...' : 'Login'}
+              {loading ? (mode === 'login' ? 'Logging in...' : 'Creating account...') : mode === 'login' ? 'Login' : 'Create Account'}
             </button>
             {error && <div className="error-message">{error}</div>}
           </form>
+          <p className="auth-mode-prompt">
+            {mode === 'login' ? "Don't have an account?" : 'Already have an account?'}{' '}
+            <button type="button" className="auth-mode-toggle" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}>
+              {mode === 'login' ? 'Sign up' : 'Back to login'}
+            </button>
+          </p>
         </div>
       </div>
     </div>

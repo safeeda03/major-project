@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { authenticate } = require('./middleware/auth');
 
 // Load environment variables
 dotenv.config();
@@ -129,29 +130,37 @@ app.post('/api/chatbot/voice', voiceUpload.single('audio'), async (req, res) => 
 });
 
 // GIS Routes (to be implemented)
-app.get('/api/gis/centres', async (req, res) => {
+app.get('/api/gis/centres', authenticate, async (req, res) => {
   try {
     const AnganwadiCentre = require('./models/AnganwadiCentre');
-    const centres = await AnganwadiCentre.find();
+    if (!req.user) return res.status(401).json({ message: 'Please log in to continue.' });
+    const Beneficiary = require('./models/Beneficiary');
+    const centreId = req.user.role === 'worker' ? req.user.centreId : req.user.role === 'parent'
+      ? (await Beneficiary.findOne({ beneficiary_id: req.user.beneficiaryId }).select('anganwadi_id'))?.anganwadi_id
+      : null;
+    const centres = await AnganwadiCentre.find(centreId ? { centre_id: centreId } : req.user.role === 'parent' ? { centre_id: '__none__' } : {});
     res.json(centres);
   } catch (error) {
     res.status(500).json({ message: 'GIS error', error: error.message });
   }
 });
 
-app.post('/api/gis/centres', async (req, res) => {
+app.post('/api/gis/centres', authenticate, async (req, res) => {
   try {
+    if (req.user?.role !== 'supervisor') return res.status(403).json({ message: 'Only supervisors can manage centres.' });
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ message: 'MongoDB is not connected. Start the MongoDB service, then try saving the centre again.' });
     }
     const AnganwadiCentre = require('./models/AnganwadiCentre');
-    const { centre_id, name, latitude, longitude, address, worker_name, worker_phone } = req.body;
+    const { centre_id, name, latitude, longitude, address, worker_id, worker_name, worker_phone } = req.body;
+    if (!String(worker_id || '').trim()) return res.status(400).json({ message: 'Assign an Anganwadi Worker ID before saving this centre.' });
     const centre = await AnganwadiCentre.create({
-      centre_id: String(centre_id || '').trim(),
+      centre_id: String(centre_id || '').trim().toUpperCase(),
       name: String(name || '').trim(),
       latitude: Number(latitude),
       longitude: Number(longitude),
       address: String(address || '').trim(),
+      worker_id: String(worker_id || '').trim().toUpperCase(),
       worker_name: String(worker_name || '').trim(),
       worker_phone: String(worker_phone || '').trim()
     });
@@ -165,23 +174,37 @@ app.post('/api/gis/centres', async (req, res) => {
   }
 });
 
-app.put('/api/gis/centres/:id', async (req, res) => {
+app.put('/api/gis/centres/:id', authenticate, async (req, res) => {
   try {
+    if (req.user?.role !== 'supervisor') return res.status(403).json({ message: 'Only supervisors can manage centres.' });
     if (mongoose.connection.readyState !== 1) {
       return res.status(503).json({ message: 'MongoDB is not connected. Start the MongoDB service, then try updating the centre again.' });
     }
     const AnganwadiCentre = require('./models/AnganwadiCentre');
-    const { centre_id, name, latitude, longitude, address, worker_name, worker_phone } = req.body;
+    const { centre_id, name, latitude, longitude, address, worker_id, worker_name, worker_phone } = req.body;
+    if (!String(worker_id || '').trim()) return res.status(400).json({ message: 'Assign an Anganwadi Worker ID before saving this centre.' });
+    const previousCentre = await AnganwadiCentre.findById(req.params.id);
+    if (!previousCentre) return res.status(404).json({ message: 'Centre not found.' });
     const centre = await AnganwadiCentre.findByIdAndUpdate(req.params.id, {
-      centre_id: String(centre_id || '').trim(),
+      centre_id: String(centre_id || '').trim().toUpperCase(),
       name: String(name || '').trim(),
       latitude: Number(latitude),
       longitude: Number(longitude),
       address: String(address || '').trim(),
+      worker_id: String(worker_id || '').trim().toUpperCase(),
       worker_name: String(worker_name || '').trim(),
       worker_phone: String(worker_phone || '').trim()
     }, { new: true, runValidators: true });
     if (!centre) return res.status(404).json({ message: 'Centre not found.' });
+    const User = require('./models/User');
+    if (previousCentre.centre_id !== centre.centre_id) {
+      const Beneficiary = require('./models/Beneficiary');
+      await Beneficiary.updateMany({ anganwadi_id: previousCentre.centre_id }, { $set: { anganwadi_id: centre.centre_id } });
+    }
+    await User.updateMany({ centreId: previousCentre.centre_id }, { $set: { centreId: centre.centre_id } });
+    if (previousCentre.worker_id !== centre.worker_id) {
+      await User.updateMany({ centreId: centre.centre_id, workerId: previousCentre.worker_id }, { $set: { workerId: centre.worker_id } });
+    }
     res.json(centre);
   } catch (error) {
     const duplicateCentre = error?.code === 11000;

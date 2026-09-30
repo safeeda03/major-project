@@ -32,6 +32,7 @@ const anganwadiCentreSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  worker_id: { type: String, trim: true, uppercase: true, sparse: true, unique: true },
   createdAt: {
     type: Date,
     default: Date.now

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
-import { attendanceAPI, beneficiaryAPI } from '../services/api';
+import { attendanceAPI, beneficiaryAPI, gisAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const localDateValue = (date = new Date()) => {
@@ -33,6 +33,13 @@ const Attendance = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [centreName, setCentreName] = useState('');
+
+  useEffect(() => {
+    if (isParent) return;
+    gisAPI.getCentres().then((centres) => setCentreName(centres[0]?.name || user?.centreId || ''))
+      .catch(() => setCentreName(user?.centreId || ''));
+  }, [isParent, user]);
 
   useEffect(() => {
     if (isParent) {
@@ -113,7 +120,7 @@ const Attendance = () => {
               </table></div>}
             </div>
           </> : <>
-            <div className="attendance-heading"><div><h2>Daily Attendance</h2><p>Record attendance for all registered children.</p></div>
+            <div className="attendance-heading"><div><h2>Daily Attendance</h2><p>Record attendance for all registered children{centreName ? ` at ${centreName}` : ''}.</p></div>
               <div className="attendance-date"><label htmlFor="attendance-date">Date</label><input id="attendance-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} /></div>
             </div>
             <section className="attendance-summary" aria-label="Attendance summary">

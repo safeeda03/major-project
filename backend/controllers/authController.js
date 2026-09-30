@@ -1,18 +1,17 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const Beneficiary = require('../models/Beneficiary');
+const AnganwadiCentre = require('../models/AnganwadiCentre');
 
 const ALLOWED_ROLES = ['worker', 'supervisor', 'parent'];
 
 // Login controller
 exports.login = async (req, res) => {
   try {
-    const { phone, email, identifier, password, role } = req.body;
+    const { phone, email, identifier, password } = req.body;
     const loginIdentifier = String(identifier || email || phone || '').trim();
-
-    if (!ALLOWED_ROLES.includes(role)) {
-      return res.status(403).json({ message: 'Unauthorized role' });
-    }
+    if (!loginIdentifier || !password) return res.status(400).json({ message: 'Email or phone number and password are required.' });
 
     // Find user by phone number or email address.
     const user = await User.findOne({
@@ -31,11 +30,6 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Check role
-    if (user.role !== role) {
-      return res.status(403).json({ message: 'Unauthorized for this role' });
-    }
-
     // Generate JWT token
     const token = jwt.sign(
       { userId: user._id, role: user.role },
@@ -52,7 +46,10 @@ exports.login = async (req, res) => {
         name: user.name,
         phone: user.phone,
         email: user.email,
-        role: user.role
+        role: user.role,
+        workerId: user.workerId,
+        centreId: user.centreId,
+        beneficiaryId: user.beneficiaryId
       }
     });
   } catch (error) {
@@ -72,31 +69,65 @@ exports.logout = async (req, res) => {
 // Register controller
 exports.register = async (req, res) => {
   try {
-    const { name, phone, email, password, role } = req.body;
+    const { name, phone, email, password, confirmPassword, role } = req.body;
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const normalizedPhone = String(phone || '').replace(/[\s()-]/g, '');
+    const workerId = String(req.body.workerId || '').trim().toUpperCase();
+    const centreId = String(req.body.centreId || '').trim().toUpperCase();
+    const beneficiaryId = String(req.body.beneficiaryId || '').trim().toUpperCase();
 
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Role must be worker, supervisor, or parent' });
     }
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ phone });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
+    if (!String(name || '').trim() || !normalizedEmail || !/^\S+@\S+\.\S+$/.test(normalizedEmail) || !/^\+?[0-9]{7,15}$/.test(normalizedPhone)) {
+      return res.status(400).json({ message: 'Enter your name, a valid email address, and a valid phone number.' });
+    }
+    if (typeof password !== 'string' || password.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters.' });
+    if (password !== confirmPassword) return res.status(400).json({ message: 'Passwords do not match.' });
+
+    let centre = null;
+    let beneficiary = null;
+    if (role === 'worker') {
+      if (!centreId) return res.status(400).json({ message: 'Centre ID is required.' });
+      centre = await AnganwadiCentre.findOne({ centre_id: centreId });
+      if (!centre) return res.status(400).json({ message: 'Invalid Centre ID. Please enter the Centre ID provided by your Supervisor.' });
+      if (!workerId || centre.worker_id !== workerId) return res.status(400).json({ message: 'Invalid Anganwadi Worker ID. Please check the ID provided by your Supervisor.' });
+      if (await User.exists({ workerId })) return res.status(409).json({ message: 'This Anganwadi Worker ID is already linked to an account.' });
+    } else if (role === 'parent') {
+      beneficiary = await Beneficiary.findOne({ beneficiary_id: beneficiaryId, beneficiary_type: 'child' });
+      if (!beneficiary) return res.status(400).json({ message: 'Invalid Beneficiary ID. Please enter the Beneficiary ID provided by your Anganwadi Worker.' });
+      if (await User.exists({ beneficiaryId })) return res.status(409).json({ message: 'This Beneficiary ID is already linked to a parent account.' });
+      if (beneficiary.parent_id && await User.exists({ user_id: beneficiary.parent_id, role: 'parent' })) {
+        return res.status(409).json({ message: 'This Beneficiary ID is already linked to a parent account.' });
+      }
+    }
+
+    if (await User.exists({ $or: [{ phone: normalizedPhone }, { email: normalizedEmail }] })) {
+      return res.status(409).json({ message: 'An account with this email or phone number already exists.' });
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user
+    const userId = `USR-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const user = new User({
+      user_id: userId,
       name,
-      phone,
-      email,
+      phone: normalizedPhone,
+      email: normalizedEmail,
       password: hashedPassword,
-      role
+      role,
+      ...(role === 'worker' ? { workerId, centreId } : {}),
+      ...(role === 'parent' ? { beneficiaryId } : {})
     });
 
     await user.save();
+    if (beneficiary) {
+      beneficiary.parent_id = user.user_id;
+      await beneficiary.save();
+    }
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -105,10 +136,13 @@ exports.register = async (req, res) => {
         name: user.name,
         phone: user.phone,
         email: user.email,
-        role: user.role
+        role: user.role,
+        workerId: user.workerId,
+        centreId: user.centreId,
+        beneficiaryId: user.beneficiaryId
       }
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(error.code === 11000 ? 409 : 500).json({ message: error.code === 11000 ? 'This email, phone number, or ID is already linked to an account.' : 'Server error', error: error.message });
   }
 };

@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import { beneficiaryAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const blank = () => ({ name: '', dob: '', gender: '', beneficiary_type: 'child', parent_id: '', anganwadi_id: '', contact_phone: '', notes: '' });
 const labels = { child: 'Child', pregnant_woman: 'Pregnant woman', lactating_mother: 'Lactating mother', elderly_person: 'Elderly person' };
 
 export default function Beneficiary() {
+  const { user } = useAuth();
   const [form, setForm] = useState(blank());
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
@@ -33,7 +35,7 @@ export default function Beneficiary() {
       <Field label="Beneficiary type"><select name="beneficiary_type" value={form.beneficiary_type} onChange={change}><option value="child">Child</option><option value="pregnant_woman">Pregnant woman</option><option value="lactating_mother">Lactating mother</option><option value="elderly_person">Elderly person</option></select></Field>
       <Field label="Full name"><input name="name" value={form.name} onChange={change} required /></Field><Field label="Date of birth"><input type="date" name="dob" value={form.dob} onChange={change} required /></Field>
       <Field label="Gender"><select name="gender" value={form.gender} onChange={change} required><option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option></select></Field>
-      <Field label="Parent/guardian ID"><input name="parent_id" value={form.parent_id} onChange={change} required /></Field><Field label="Anganwadi centre ID"><input name="anganwadi_id" value={form.anganwadi_id} onChange={change} required /></Field>
+      <p className="form-hint">Assigned centre: <strong>{user?.centreId || 'Not assigned'}</strong>. Parents create their own accounts using the Beneficiary ID after registration.</p>
       <Field label="Contact phone (optional)"><input type="tel" name="contact_phone" value={form.contact_phone} onChange={change} /></Field><Field label="Notes / observations"><textarea name="notes" value={form.notes} onChange={change} /></Field>
       <button className="submit-btn" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Register beneficiary'}</button>{editing && <button type="button" className="secondary-btn" onClick={reset}>Cancel</button>}
     </form>{message && <div className="success-message">{message}</div>}{error && <div className="error-message">{error}</div>}</div>

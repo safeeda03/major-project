@@ -1,4 +1,5 @@
 const HealthRecord = require('../models/HealthRecord');
+const { getScopedBeneficiaryIds } = require('../middleware/auth');
 
 const getDayRange = (date) => {
   const start = new Date(`${date}T00:00:00.000Z`);
@@ -19,7 +20,8 @@ const calculateHealthValues = (height, weight) => {
 // Get all health records
 exports.getAllHealthRecords = async (req, res) => {
   try {
-    const healthRecords = await HealthRecord.find();
+    const ids = await getScopedBeneficiaryIds(req.user);
+    const healthRecords = await HealthRecord.find(ids ? { beneficiary_id: { $in: ids } } : {});
     res.json(healthRecords);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -43,6 +45,9 @@ exports.getHealthRecordById = async (req, res) => {
 exports.createHealthRecord = async (req, res) => {
   try {
     const { beneficiary_id, height, weight, date } = req.body;
+    if (req.user.role === 'parent' || !req.user.centreId) return res.status(403).json({ message: 'Only an assigned Anganwadi worker can add health records.' });
+    const allowedIds = await getScopedBeneficiaryIds(req.user);
+    if (!allowedIds.includes(beneficiary_id)) return res.status(403).json({ message: 'This child does not belong to your centre.' });
 
     const { start, end } = getDayRange(date);
     if (Number.isNaN(start.getTime())) {
@@ -95,6 +100,11 @@ exports.updateHealthRecord = async (req, res) => {
       updateData = { ...updateData, height, weight, bmi, health_status };
     }
 
+    const current = await HealthRecord.findById(req.params.id);
+    if (!current) return res.status(404).json({ message: 'Health record not found' });
+    const allowedIds = await getScopedBeneficiaryIds(req.user);
+    if (req.user.role !== 'supervisor' && !allowedIds.includes(current.beneficiary_id)) return res.status(403).json({ message: 'This record is outside your access.' });
+    if (req.user.role === 'worker' && beneficiary_id && !allowedIds.includes(beneficiary_id)) return res.status(403).json({ message: 'This child does not belong to your centre.' });
     const healthRecord = await HealthRecord.findByIdAndUpdate(
       req.params.id,
       updateData,
@@ -117,6 +127,10 @@ exports.updateHealthRecord = async (req, res) => {
 // Delete health record
 exports.deleteHealthRecord = async (req, res) => {
   try {
+    const current = await HealthRecord.findById(req.params.id);
+    if (!current) return res.status(404).json({ message: 'Health record not found' });
+    const allowedIds = await getScopedBeneficiaryIds(req.user);
+    if (req.user.role !== 'supervisor' && !allowedIds.includes(current.beneficiary_id)) return res.status(403).json({ message: 'This record is outside your access.' });
     const healthRecord = await HealthRecord.findByIdAndDelete(req.params.id);
 
     if (!healthRecord) {
@@ -132,6 +146,8 @@ exports.deleteHealthRecord = async (req, res) => {
 // Get health records by beneficiary
 exports.getHealthRecordsByBeneficiary = async (req, res) => {
   try {
+    const allowedIds = await getScopedBeneficiaryIds(req.user);
+    if (allowedIds && !allowedIds.includes(req.params.beneficiaryId)) return res.status(403).json({ message: 'You cannot access records for this beneficiary.' });
     const records = await HealthRecord.find({ beneficiary_id: req.params.beneficiaryId })
       .sort({ date: -1, createdAt: -1 });
     // For historic duplicate rows, show only the newest value for each date.

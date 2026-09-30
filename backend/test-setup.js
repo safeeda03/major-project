@@ -17,7 +17,9 @@ async function createTestUsers() {
         phone: '9876543210',
         email: 'anganwadiworker@gmail.com',
         password: 'password123',
-        role: 'worker'
+        role: 'worker',
+        workerId: 'AWW001',
+        centreId: 'ANG001'
       },
       {
         user_id: 'SUP001',
@@ -33,7 +35,8 @@ async function createTestUsers() {
         phone: '9876543212',
         email: 'fimsha@gmail.com',
         password: 'password123',
-        role: 'parent'
+        role: 'parent',
+        beneficiaryId: 'BEN005'
       }
     ];
     

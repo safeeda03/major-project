@@ -4,6 +4,7 @@ const Vaccination = require('../models/Vaccination');
 const Beneficiary = require('../models/Beneficiary');
 const Attendance = require('../models/Attendance');
 const AnganwadiCentre = require('../models/AnganwadiCentre');
+const { getScopedBeneficiaryIds } = require('../middleware/auth');
 
 const latestRecordsByBeneficiary = (records) => {
   const latest = new Map();
@@ -22,7 +23,8 @@ const latestRecordsByBeneficiary = (records) => {
 exports.generateReport = async (req, res) => {
   try {
     const { reportType, startDate, endDate, beneficiaryCategory, centreId } = req.body;
-    const normalizedCentreId = String(centreId || '').trim();
+    const normalizedCentreId = String(req.user.role === 'worker' ? req.user.centreId : (centreId || '')).trim();
+    if (req.user.role === 'worker' && !normalizedCentreId) return res.status(403).json({ message: 'Your account is not assigned to a centre.' });
 
     let centre = null;
     if (normalizedCentreId) {
@@ -101,6 +103,7 @@ exports.generateReport = async (req, res) => {
 // Summarise the latest child-care records for every Anganwadi centre.
 exports.getCentreStatistics = async (req, res) => {
   try {
+    if (req.user.role !== 'supervisor') return res.status(403).json({ message: 'Only supervisors can view centre statistics.' });
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const [centres, beneficiaries, healthRecords, nutritionRecords, vaccinations, attendance] = await Promise.all([
@@ -169,9 +172,11 @@ exports.getCentreStatistics = async (req, res) => {
 exports.getAlerts = async (req, res) => {
   try {
     const alerts = [];
+    const allowedIds = await getScopedBeneficiaryIds(req.user);
+    const scope = allowedIds ? { beneficiary_id: { $in: allowedIds } } : {};
 
     // Use only each child's latest health measurement, not historic records.
-    const latestHealthRecords = latestRecordsByBeneficiary(await HealthRecord.find());
+    const latestHealthRecords = latestRecordsByBeneficiary(await HealthRecord.find(scope));
     const healthRisks = latestHealthRecords.filter((record) => record.health_status !== 'normal');
     if (healthRisks.length > 0) {
       alerts.push({
@@ -185,6 +190,7 @@ exports.getAlerts = async (req, res) => {
     // Vaccination due alerts
     const today = new Date();
     const dueVaccinations = await Vaccination.find({
+      ...scope,
       next_due_date: { $lte: today },
       completed: { $ne: true }
     });
@@ -198,7 +204,7 @@ exports.getAlerts = async (req, res) => {
     }
 
     // Use only each child's latest nutrition assessment.
-    const latestNutritionRecords = latestRecordsByBeneficiary(await NutritionRecord.find());
+    const latestNutritionRecords = latestRecordsByBeneficiary(await NutritionRecord.find(scope));
     const nutritionRisks = latestNutritionRecords.filter((record) => (
       ['underweight', 'stunted', 'wasted'].includes(record.nutrition_status)
     ));
@@ -214,7 +220,7 @@ exports.getAlerts = async (req, res) => {
     // Calculate the actual attendance rate from records entered in the last 30 days.
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const recentAttendance = await Attendance.find({ date: { $gte: thirtyDaysAgo } });
+    const recentAttendance = await Attendance.find({ ...scope, date: { $gte: thirtyDaysAgo } });
     if (recentAttendance.length > 0) {
       const attendanceUnits = recentAttendance.reduce((total, record) => (
         total + (record.status === 'present' ? 1 : record.status === 'half-day' ? 0.5 : 0)
@@ -240,17 +246,19 @@ exports.getAlerts = async (req, res) => {
 exports.getAlertDetails = async (req, res) => {
   try {
     const { type } = req.params;
+    const allowedIds = await getScopedBeneficiaryIds(req.user);
+    const scope = allowedIds ? { beneficiary_id: { $in: allowedIds } } : {};
     let title;
     let records;
 
     if (type === 'health') {
-      const latestRecords = latestRecordsByBeneficiary(await HealthRecord.find());
+      const latestRecords = latestRecordsByBeneficiary(await HealthRecord.find(scope));
       records = latestRecords
         .filter((record) => record.health_status !== 'normal')
         .map((record) => ({ beneficiary_id: record.beneficiary_id, status: record.health_status, date: record.date }));
       title = 'Growth and Health Risk';
     } else if (type === 'nutrition') {
-      const latestRecords = latestRecordsByBeneficiary(await NutritionRecord.find());
+      const latestRecords = latestRecordsByBeneficiary(await NutritionRecord.find(scope));
       records = latestRecords
         .filter((record) => ['underweight', 'stunted', 'wasted'].includes(record.nutrition_status))
         .map((record) => ({ beneficiary_id: record.beneficiary_id, status: record.nutrition_status, date: record.date }));
@@ -258,6 +266,7 @@ exports.getAlertDetails = async (req, res) => {
     } else if (type === 'vaccination') {
       const today = new Date();
       const vaccinations = await Vaccination.find({
+        ...scope,
         next_due_date: { $lte: today },
         completed: { $ne: true }
       });
@@ -270,7 +279,7 @@ exports.getAlertDetails = async (req, res) => {
     } else if (type === 'attendance') {
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const attendance = await Attendance.find({ date: { $gte: thirtyDaysAgo } });
+      const attendance = await Attendance.find({ ...scope, date: { $gte: thirtyDaysAgo } });
       const byBeneficiary = attendance.reduce((summary, record) => {
         const current = summary.get(record.beneficiary_id) || { total: 0, units: 0, latestDate: record.date };
         current.total += 1;

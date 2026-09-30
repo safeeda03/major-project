@@ -44,6 +44,9 @@ const seedData = async () => {
       {
         centre_id: 'ANG001',
         name: 'Anganwadi Centre A',
+        worker_id: 'AWW001',
+        worker_name: 'Rajesh Kumar',
+        worker_phone: '9876543210',
         latitude: 28.6139,
         longitude: 77.2090,
         address: 'Sector 1, New Delhi'
@@ -51,6 +54,9 @@ const seedData = async () => {
       {
         centre_id: 'ANG002',
         name: 'Anganwadi Centre B',
+        worker_id: 'AWW002',
+        worker_name: 'Worker Two',
+        worker_phone: '9000000002',
         latitude: 28.6150,
         longitude: 77.2100,
         address: 'Sector 2, New Delhi'
@@ -58,6 +64,9 @@ const seedData = async () => {
       {
         centre_id: 'ANG003',
         name: 'Anganwadi Centre C',
+        worker_id: 'AWW003',
+        worker_name: 'Worker Three',
+        worker_phone: '9000000003',
         latitude: 28.6170,
         longitude: 77.2080,
         address: 'Sector 3, New Delhi'
@@ -75,7 +84,9 @@ const seedData = async () => {
         phone: '9876543210',
         email: 'anganwadiworker@gmail.com',
         password: hashedPassword,
-        role: 'worker'
+        role: 'worker',
+        workerId: 'AWW001',
+        centreId: 'ANG001'
       },
       {
         user_id: 'USR002',
@@ -91,7 +102,8 @@ const seedData = async () => {
         phone: '9876543212',
         email: 'fimsha@gmail.com',
         password: hashedPassword,
-        role: 'parent'
+        role: 'parent',
+        beneficiaryId: 'BEN005'
       }
     ]);
 

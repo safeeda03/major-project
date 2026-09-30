@@ -1,5 +1,7 @@
 const express = require('express');
 const router = express.Router();
+const { authenticate, requireRoles } = require('../middleware/auth');
+router.use(authenticate, requireRoles('worker', 'supervisor'));
 const { generateReport, getAlerts, getAlertDetails, getCentreStatistics } = require('../controllers/reportController');
 
 // Generate report
