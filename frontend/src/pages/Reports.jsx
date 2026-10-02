@@ -11,7 +11,9 @@ const reportLabels = {
   nutrition: 'Nutrition Report',
   vaccination: 'Vaccination Report',
   attendance: 'Attendance Report',
-  centre: 'Centre Report'
+  centre: 'Centre Report',
+  activity: 'Centre Activity Report',
+  monthly: 'Monthly Centre Summary'
 };
 
 const reportColumns = {
@@ -20,7 +22,9 @@ const reportColumns = {
   nutrition: ['Beneficiary ID', 'Date', 'Status', 'Meals', 'Recommendations'],
   vaccination: ['Beneficiary ID', 'Vaccine', 'Given on', 'Next due', 'Status'],
   attendance: ['Beneficiary ID', 'Date', 'Attendance'],
-  centre: ['Centre ID', 'Registered Beneficiaries']
+  centre: ['Centre ID', 'Registered Beneficiaries'],
+  activity: ['Date', 'Activity type', 'Beneficiary', 'Details', 'Follow-up'],
+  monthly: ['Metric', 'Count']
 };
 
 const reportRow = (type, record) => {
@@ -31,6 +35,8 @@ const reportRow = (type, record) => {
     case 'vaccination': return [record.beneficiary_id, record.vaccine, formatDate(record.date), formatDate(record.next_due_date), record.completed ? 'Completed' : 'Pending'];
     case 'attendance': return [record.beneficiary_id, formatDate(record.date), record.status];
     case 'centre': return [record.centre_id, record.beneficiaryCount];
+    case 'activity': return [formatDate(record.date), record.activity_type, record.beneficiary_id || 'Centre-wide', record.service_type || record.details || '-', record.follow_up_required ? (record.follow_up_status || 'Required') : 'No'];
+    case 'monthly': return [record.metric, record.count];
     default: return [];
   }
 };
@@ -89,6 +95,8 @@ const Reports = () => {
                   <option value="vaccination">Vaccination Report</option>
                   <option value="attendance">Attendance Report</option>
                   <option value="centre">Centre Report</option>
+                  <option value="activity">Centre Activity Report</option>
+                  <option value="monthly">Monthly Centre Summary</option>
                 </select>
               </div>
               {reportType === 'beneficiary' && <div className="form-group">

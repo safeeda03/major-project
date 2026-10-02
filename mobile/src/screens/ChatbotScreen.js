@@ -32,6 +32,7 @@ const ChatbotScreen = () => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
   const scrollViewRef = useRef(null);
 
   useEffect(() => {
@@ -119,6 +120,7 @@ const ChatbotScreen = () => {
 
     try {
       const response = await API.chatbot.sendMessage(message, conversationHistory);
+      if (response.action === 'confirm') setPendingAction(response.draft);
       setMessages((current) => [
         ...current,
         {
@@ -136,6 +138,20 @@ const ChatbotScreen = () => {
           text: error.response?.data?.message || 'I could not reach the assistant. Check your API connection and try again.',
         },
       ]);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const confirmAction = async () => {
+    if (!pendingAction || isSending) return;
+    setIsSending(true);
+    try {
+      const response = await API.chatbot.confirmAction(pendingAction);
+      setPendingAction(null);
+      setMessages((current) => [...current, { id: `${Date.now()}-confirmation`, sender: 'bot', text: response.response || 'Action completed successfully.' }]);
+    } catch (error) {
+      Alert.alert('Action unavailable', error.response?.data?.message || error.message || 'The action could not be completed.');
     } finally {
       setIsSending(false);
     }
@@ -177,6 +193,17 @@ const ChatbotScreen = () => {
           </View>
         )}
       </ScrollView>
+
+      {pendingAction && (
+        <View style={styles.confirmationBar}>
+          <TouchableOpacity style={styles.confirmButton} onPress={confirmAction} disabled={isSending}>
+            <Text style={styles.confirmButtonText}>Confirm</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.cancelButton} onPress={() => setPendingAction(null)} disabled={isSending}>
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.quickQuestionsContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -249,6 +276,11 @@ const styles = StyleSheet.create({
   voiceButtonActive: { backgroundColor: '#c0392b' },
   sendButton: { backgroundColor: '#165C55' },
   buttonDisabled: { opacity: 0.45 },
+  confirmationBar: { flexDirection: 'row', gap: 8, padding: 10, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#e6eceb' },
+  confirmButton: { flex: 1, backgroundColor: '#165C55', paddingVertical: 11, alignItems: 'center', borderRadius: 8 },
+  cancelButton: { flex: 1, backgroundColor: '#edf1f0', paddingVertical: 11, alignItems: 'center', borderRadius: 8 },
+  confirmButtonText: { color: '#fff', fontWeight: '700' },
+  cancelButtonText: { color: '#165C55', fontWeight: '700' },
 });
 
 export default ChatbotScreen;

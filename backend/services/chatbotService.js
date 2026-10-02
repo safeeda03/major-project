@@ -2,6 +2,7 @@ const MAX_MESSAGE_LENGTH = 4_000;
 const MAX_HISTORY_MESSAGES = 8;
 const REQUEST_TIMEOUT_MS = 45_000;
 const NUTRITION_KNOWLEDGE = require('../data/nutrition-knowledge.json');
+const AssistantActionService = require('./assistantActionService');
 
 const ASSISTANT_INSTRUCTIONS = `You are PoshanAI, a practical child-nutrition counsellor for parents and Anganwadi workers in Kerala and India.
 
@@ -165,7 +166,7 @@ Monitoring and referral
     return /[\u0D00-\u0D7F]/.test(message) ? 'ml-IN' : this.normalizeLanguage(requestedLanguage);
   }
 
-  static async processMessage(rawMessage, history = [], language = 'en-IN') {
+  static async processMessage(rawMessage, history = [], language = 'en-IN', user = null) {
     const message = typeof rawMessage === 'string' ? rawMessage.trim() : '';
     if (!message) {
       const error = new Error('A message is required.');
@@ -176,6 +177,11 @@ Monitoring and referral
       const error = new Error(`Messages must be ${MAX_MESSAGE_LENGTH} characters or fewer.`);
       error.statusCode = 400;
       throw error;
+    }
+
+    if (user) {
+      const actionResult = await AssistantActionService.process(message, user, history, this.detectLanguage(message, language));
+      if (actionResult) return { ...actionResult, language: this.detectLanguage(message, language), timestamp: new Date().toISOString() };
     }
 
     const baseUrl = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '');
@@ -239,6 +245,10 @@ Monitoring and referral
       language: selectedLanguage,
       timestamp: new Date().toISOString(),
     };
+  }
+
+  static async confirmAction(draft, user) {
+    return AssistantActionService.confirm(draft, user);
   }
 }
 

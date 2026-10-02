@@ -2,12 +2,32 @@ const fs = require('fs');
 const path = require('path');
 const Tesseract = require('tesseract.js');
 const pdfParse = require('pdf-parse');
-const sharp = require('sharp');
+
+// Sharp is only used for optional image enhancement. Keep OCR available on
+// Windows setups where native Sharp binaries may be blocked by policy.
+let sharp = null;
+try {
+  sharp = require('sharp');
+} catch (error) {
+  console.warn('Optional Sharp image enhancement is unavailable:', error.message);
+}
 
 const DATE_PATTERN = /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4})/i;
 const VACCINE_PATTERN = /\b(bcg|opv|polio|dpt|pentavalent|mmr|measles|hepatitis\s*b)\b/i;
 const SAMPLE_FOOTER_PATTERN = /sample\s+document\s+prepared\s+for\s+testing\s+the\s+poshanai\s+ocr\s+scanning\s+feature\.?/gi;
 const OCR_CACHE_DIRECTORY = path.join(__dirname, '..', '.cache', 'tesseract');
+
+function getPngDimensions(filePath) {
+  try {
+    const header = fs.readFileSync(filePath).subarray(0, 24);
+    const isPng = header.length >= 24
+      && header.readUInt32BE(0) === 0x89504e47
+      && header.readUInt32BE(4) === 0x0d0a1a0a;
+    return isPng ? { width: header.readUInt32BE(16), height: header.readUInt32BE(20) } : null;
+  } catch {
+    return null;
+  }
+}
 
 function editDistance(left, right) {
   const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
@@ -40,6 +60,52 @@ function hasFuzzyLabel(line, label) {
   return false;
 }
 
+function mergeOCRText(texts) {
+  return [...new Set(texts
+    .flatMap((candidate) => String(candidate || '').replace(/\r/g, '').split('\n'))
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean))].join('\n').trim();
+}
+
+function addEvidence(items, label, value) {
+  const cleaned = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!cleaned || cleaned.length < 2 || items.some((item) => item.label === label && item.value === cleaned)) return;
+  items.push({ label, value: cleaned });
+}
+
+function isReadableOCRLine(line) {
+  const value = String(line || '').trim();
+  if (value.length < 4) return false;
+  const readableCharacters = value.match(/[\p{L}\p{N}]/gu) || [];
+  return readableCharacters.length >= 4 && readableCharacters.length / value.length >= 0.35;
+}
+
+function splitReportText(text) {
+  const normalized = String(text || '').replace(/\r/g, '').trim();
+  if (!normalized) return [];
+  const separatorBlocks = normalized.split(/\n\s*(?:-{3,}|={3,}|\*{3,})\s*\n/).map((block) => block.trim()).filter(Boolean);
+  const headingPattern = /^(?:child\s+health|health\s+screening|growth|nutrition|vaccination|immunization|attendance|food\s+distribution|home\s+visit|referral|medical|monthly|weekly|report|record)\s*(?:report|record|details)?\s*:?\s*$/i;
+  const blocks = separatorBlocks.length > 1 ? separatorBlocks : [];
+  if (!blocks.length) {
+    let current = [];
+    for (const line of normalized.split('\n')) {
+      if (headingPattern.test(line.trim()) && current.length) {
+        blocks.push(current.join('\n').trim());
+        current = [];
+      }
+      current.push(line);
+    }
+    if (current.length) blocks.push(current.join('\n').trim());
+  }
+  const usefulBlocks = blocks.filter((block) => block.split('\n').filter(Boolean).length >= 2);
+  const selected = usefulBlocks.length > 1 ? usefulBlocks : [normalized];
+  return selected.map((block, index) => ({
+    id: 'report-' + (index + 1),
+    text: block,
+    title: block.split('\n').map((line) => line.trim()).find((line) => headingPattern.test(line)) || 'Report ' + (index + 1),
+  }));
+}
+
 class OCRService {
   static async processDocument(file) {
     if (!file || !file.path) {
@@ -50,25 +116,66 @@ class OCRService {
 
     try {
       fs.mkdirSync(OCR_CACHE_DIRECTORY, { recursive: true });
-      const isPdf = path.extname(file.originalname || file.path).toLowerCase() === '.pdf'
+      const extension = path.extname(file.originalname || file.path).toLowerCase();
+      const isPdf = extension === '.pdf'
         || file.mimetype === 'application/pdf';
+      const isText = extension === '.txt' || file.mimetype === 'text/plain';
       let rawText;
       let confidence = null;
       let alternativeTexts = [];
 
-      if (isPdf) {
+      if (isText) {
+        rawText = fs.readFileSync(file.path, 'utf8').replace(/\r/g, '').trim();
+        confidence = 100;
+      } else if (isPdf) {
         const pdf = await pdfParse(fs.readFileSync(file.path));
         rawText = pdf.text.replace(/\r/g, '').trim();
       } else {
         const recognitionOptions = { cachePath: OCR_CACHE_DIRECTORY, tessedit_pageseg_mode: '6' };
         const attempts = [];
-        const original = await Tesseract.recognize(file.path, 'eng', recognitionOptions);
-        attempts.push(original);
+        for (const pageSegMode of [6, 4, 11]) {
+          attempts.push(await Tesseract.recognize(file.path, 'eng', {
+            ...recognitionOptions,
+            tessedit_pageseg_mode: String(pageSegMode),
+          }));
+        }
+
+        // Full-page OCR can skip text inside bordered tables. A focused pass
+        // over the first data row recovers the common Child Name field.
+        const dimensions = getPngDimensions(file.path);
+        if (dimensions) {
+          const tableWorker = await Tesseract.createWorker({ cachePath: OCR_CACHE_DIRECTORY });
+          try {
+            await tableWorker.loadLanguage('eng');
+            await tableWorker.initialize('eng');
+            attempts.push(await tableWorker.recognize(file.path, {
+              tessedit_pageseg_mode: '6',
+              rectangle: {
+                left: Math.round(dimensions.width * 0.02),
+                top: Math.round(dimensions.height * 0.20),
+                width: Math.round(dimensions.width * 0.96),
+                height: Math.round(dimensions.height * 0.16),
+              },
+            }));
+            attempts.push(await tableWorker.recognize(file.path, {
+              tessedit_pageseg_mode: '6',
+              rectangle: {
+                left: Math.round(dimensions.width * 0.427),
+                top: Math.round(dimensions.height * 0.201),
+                width: Math.round(dimensions.width * 0.531),
+                height: Math.round(dimensions.height * 0.403),
+              },
+            }));
+          } finally {
+            await tableWorker.terminate();
+          }
+        }
+        const original = attempts[0];
 
         // Handwritten pages photographed on paper often contain pale writing
         // from the reverse side. Try local contrast cleanup only when the
         // original OCR confidence is low, and retain the clearest pass.
-        if (original.data.confidence < 65) {
+        if (original.data.confidence < 65 && sharp) {
           const baseImage = sharp(file.path).rotate().grayscale().normalize().sharpen();
           for (const threshold of [130, 110]) {
             const image = await baseImage.clone().threshold(threshold).png().toBuffer();
@@ -76,9 +183,17 @@ class OCRService {
           }
         }
 
-        const bestAttempt = attempts.reduce((best, attempt) => (
-          attempt.data.confidence > best.data.confidence ? attempt : best
-        ));
+        const attemptsWithChildName = attempts.filter((attempt) => /child\s*name|name\s+of\s+child/i.test(attempt.data.text || ''));
+        const rankedAttempts = attemptsWithChildName.length ? attemptsWithChildName : attempts;
+        const bestAttempt = rankedAttempts.reduce((best, attempt) => {
+          const score = (candidate) => {
+            const candidateText = candidate.data.text || '';
+            const hasChildName = /child\s*name|name\s+of\s+child/i.test(candidateText);
+            const hasNutrition = /nutrition/i.test(candidateText);
+            return candidate.data.confidence + (hasChildName ? 15 : 0) + (hasNutrition ? 2 : 0);
+          };
+          return score(attempt) > score(best) ? attempt : best;
+        });
         rawText = bestAttempt.data.text.replace(/\r/g, '').trim();
         confidence = Number(bestAttempt.data.confidence.toFixed(1));
         alternativeTexts = attempts
@@ -86,15 +201,30 @@ class OCRService {
           .map((attempt) => attempt.data.text.replace(/\r/g, '').trim());
       }
       rawText = rawText.replace(SAMPLE_FOOTER_PATTERN, '').replace(/\n{3,}/g, '\n\n').trim();
-      const extractedData = this.extractDataFromText(rawText, alternativeTexts);
+      // Keep the highest-ranked OCR pass intact. Merging every segmentation
+      // pass duplicates labels and injects partial garbage into the report.
+      const completeText = (rawText || mergeOCRText(alternativeTexts)).replace(SAMPLE_FOOTER_PATTERN, '').trim();
+      const extractedData = this.extractDataFromText(completeText);
+      const flexibleResult = this.analyzeText(completeText, extractedData);
+      const reportCandidates = splitReportText(completeText).map((candidate) => {
+        const candidateData = this.extractDataFromText(candidate.text);
+        return {
+          ...candidate,
+          ...this.analyzeText(candidate.text, candidateData),
+          extractedData: candidateData,
+        };
+      });
       return {
         success: true,
         data: {
           ...extractedData,
+          ...flexibleResult,
+          reportCandidates,
+          rawText: completeText,
           confidence,
           needsVerification: true,
         },
-        message: rawText
+        message: completeText
           ? 'Text was extracted. Please verify every field before saving it.'
           : isPdf
             ? 'No selectable text was found in this PDF. Scanned PDFs are not supported yet; upload the page as an image.'
@@ -108,9 +238,95 @@ class OCRService {
     }
   }
 
+  static analyzeText(text, extractedData = {}) {
+    const lines = text.split('\n').map((line) => line.replace(/\s+/g, ' ').trim()).filter(isReadableOCRLine);
+    const lowerText = text.toLowerCase();
+    const items = [];
+    const sections = [];
+    const usedLines = new Set();
+    const firstTitle = lines.find((line) => /\b(nutrition|health|growth|vaccin|immuni|medical|report|record|anganwadi)\b/i.test(line) && line.length < 100)
+      || lines.find((line) => line.length > 3 && line.length < 100 && !/^[-|=:]+$/.test(line));
+
+    const documentType = lowerText.includes('vaccin') || /\b(bcg|polio|opv|mmr|dpt|pentavalent|immuni[sz]ation)\b/i.test(text)
+      ? 'Vaccination or immunization report'
+      : lowerText.includes('nutrition') || /\b(diet|feeding|malnutrition|underweight)\b/i.test(text)
+        ? 'Nutrition report'
+        : lowerText.includes('growth') || /\b(weight|height|length|growth chart|percentile|z[- ]?score)\b/i.test(text)
+          ? 'Growth or child measurement report'
+          : /\b(hemoglobin|haemoglobin|laboratory|lab result|blood test|urine test|diagnosis|prescription|clinical)\b/i.test(text)
+            ? 'Medical or test report'
+            : /\b(anganwadi|beneficiary|asha|centre|center)\b/i.test(text)
+              ? 'Anganwadi or child health report'
+              : 'Child health report';
+
+    const summary = [];
+    if (firstTitle) summary.push(firstTitle);
+    if (extractedData.childName) addEvidence(items, 'Child/patient name', extractedData.childName);
+    if (extractedData.parentName) addEvidence(items, 'Parent or guardian', extractedData.parentName);
+    if (extractedData.age) addEvidence(items, 'Age', extractedData.age);
+    if (extractedData.weight) addEvidence(items, 'Weight', extractedData.weight);
+    if (extractedData.height) addEvidence(items, 'Height/length', extractedData.height);
+    if (extractedData.recordDate) addEvidence(items, 'Record date', extractedData.recordDate);
+    if (extractedData.dateOfBirth) addEvidence(items, 'Date of birth', extractedData.dateOfBirth);
+    if (extractedData.beneficiaryId) addEvidence(items, 'Beneficiary ID', extractedData.beneficiaryId);
+    if (extractedData.anganwadiId) addEvidence(items, 'Anganwadi ID', extractedData.anganwadiId);
+    if (extractedData.nutritionDetails) addEvidence(items, 'Nutrition findings', extractedData.nutritionDetails);
+    if (extractedData.healthInformation) addEvidence(items, 'Health observations', extractedData.healthInformation);
+
+    const labelPatterns = [
+      ['Age', /\b(?:age|aged)\s*[:=\-]?\s*([^,;|\n]+)/i],
+      ['Date of birth', /\b(?:date\s+of\s+birth|birth\s+date|dob)\s*[:=\-]?\s*([^,;|\n]+)/i],
+      ['Weight', /\b(?:weight)\s*[:=\-]?\s*([^,;|\n]+)/i],
+      ['Height/length', /\b(?:height|length)\s*[:=\-]?\s*([^,;|\n]+)/i],
+      ['BMI', /\bBMI\s*[:=\-]?\s*([^,;|\n]+)/i],
+      ['Report date', /\b(?:report\s+date|record\s+date|date)\s*[:=\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|[^,;|\n]+)/i],
+    ];
+    for (const [label, pattern] of labelPatterns) {
+      const match = text.match(pattern);
+      if (match) addEvidence(items, label, match[1]);
+    }
+    for (const date of text.match(new RegExp(DATE_PATTERN.source, 'gi')) || []) addEvidence(items, 'Date mentioned', date);
+
+    const categoryPatterns = [
+      ['Nutrition findings', /\b(nutrition|diet|feeding|meal|appetite|malnutrition|underweight|overweight|stunted|wasted)\b/i],
+      ['Growth measurements', /\b(growth|weight|height|length|percentile|z[- ]?score|growth chart)\b/i],
+      ['Vaccination details', /\b(vaccin|immuni[sz]|bcg|polio|opv|dpt|pentavalent|mmr|measles|hepatitis)\b/i],
+      ['Health observations', /\b(health|symptom|observation|complaint|diagnosis|condition|fever|cough|diarr|illness|clinic)\b/i],
+      ['Test or lab results', /\b(test|lab|laboratory|result|hemoglobin|haemoglobin|blood|urine|glucose|iron)\b/i],
+      ['Recommendations', /\b(recommend|advice| advised|follow[- ]?up|refer|referral|next step|should)\b/i],
+    ];
+    for (const [title, pattern] of categoryPatterns) {
+      const matchingLines = lines.filter((line) => pattern.test(line)
+        && line.length > 3
+        && !/^(?:child\s+nutrition\s+record|nutrition\s+notes?)\s*:?[.]?$/i.test(line));
+      if (matchingLines.length) {
+        sections.push({ title, items: [...new Set(matchingLines)].slice(0, 12).map((value) => ({ label: title, value })) });
+        matchingLines.forEach((line) => usedLines.add(line));
+      }
+    }
+
+    if (items.length) sections.unshift({ title: 'Identified details', items });
+    const otherInformation = lines
+      .filter((line) => !usedLines.has(line) && line.length > 2)
+      .filter((line) => !/^[-|=:]+$/.test(line))
+      .slice(0, 30)
+      .map((value) => ({ label: 'Other information', value }));
+    if (otherInformation.length) sections.push({ title: 'Other information', items: otherInformation });
+
+    return {
+      documentType,
+      summary: summary.length ? summary : [`Detected as a ${documentType.toLowerCase()}.`],
+      sections,
+    };
+  }
+
   static extractDataFromText(text, alternativeTexts = []) {
     const extractedData = {
       childName: '',
+      age: '',
+      weight: '',
+      height: '',
+      recordDate: '',
       dateOfBirth: '',
       parentName: '',
       beneficiaryId: '',
@@ -120,7 +336,9 @@ class OCRService {
       vaccinationRecords: [],
     };
 
-    for (const line of text.split('\n').map((value) => value.trim()).filter(Boolean)) {
+    const ocrLines = text.split('\n').map((value) => value.trim()).filter(Boolean);
+
+    for (const [lineIndex, line] of ocrLines.entries()) {
       const normalizedLine = line.replace(/\s+/g, ' ');
       const lowerLine = normalizedLine.toLowerCase();
 
@@ -129,9 +347,17 @@ class OCRService {
         // the next known field because OCR can merge several table cells onto
         // one line (for example: "Name Rahul Kumar Beneficiary ID BEN006").
         const match = normalizedLine.match(/(?:\bchild\s*name\b|\bname\s*of\s*child\b|\bname\b)\s*[:\-]?\s*(.+?)(?=\s+(?:beneficiary\s*id|age|gender|status)\b|$)/i);
-        const name = match?.[1]?.trim().replace(/^[|,:;\-\u2013\u2014\s]+|[|,:;\-\u2013\u2014\s]+$/g, '').trim();
+        const name = match?.[1]?.replace(/\s+child\s*name\s*:?.*$/i, '').trim().replace(/^[|,:;\-\u2013\u2014\s]+|[|,:;\-\u2013\u2014\s]+$/g, '').trim();
         if (name && !/^(?:information|details|field)$/i.test(name)) {
           extractedData.childName = name;
+        }
+
+        // Tesseract may put a table label and its value on separate lines.
+        if (!extractedData.childName && /\bchild\s*name\b/i.test(normalizedLine)) {
+          const nextLine = ocrLines[lineIndex + 1] || '';
+          if (nextLine && !/^(?:age|gender|weight|height|date|parent|guardian|nutrition|health|beneficiary|anganwadi)\b/i.test(nextLine)) {
+            extractedData.childName = nextLine.replace(/^[|,:;\-\s]+|[|,:;\-\s]+$/g, '').trim();
+          }
         }
       }
 
@@ -156,6 +382,25 @@ class OCRService {
           date: date ? date[1] : '',
           nextDue: '',
         });
+      }
+    }
+
+    // Try the same label/value extraction on alternate OCR layout passes.
+    if (!extractedData.childName) {
+      for (const candidateText of alternativeTexts) {
+        const candidateLines = candidateText.split('\n').map((value) => value.trim()).filter(Boolean);
+        for (let index = 0; index < candidateLines.length; index += 1) {
+          const labelLine = candidateLines[index];
+          if (!/\bchild\s*name\b|\bname\s+of\s+child\b/i.test(labelLine)) continue;
+          const inlineValue = labelLine.match(/(?:child\s*name|name\s+of\s+child)\s*[:\-]?\s*(.+)$/i)?.[1]?.trim();
+          const nextLine = candidateLines[index + 1] || '';
+          const value = inlineValue || (nextLine && !/^(?:age|gender|weight|height|date|parent|guardian|nutrition|health|beneficiary|anganwadi)\b/i.test(nextLine) ? nextLine : '');
+          if (value && !/^(?:child|name|information|details|field)$/i.test(value)) {
+            extractedData.childName = value.replace(/^[|,:;\-\s]+|[|,:;\-\s]+$/g, '').trim();
+            break;
+          }
+        }
+        if (extractedData.childName) break;
       }
     }
 
@@ -195,6 +440,7 @@ class OCRService {
       for (const candidateText of [text, ...alternativeTexts]) {
         const topLines = candidateText.split('\n').map((value) => value.trim()).filter(Boolean).slice(0, 10);
         for (const line of topLines) {
+          if (!hasFuzzyLabel(line, 'birth') && !/\bdob\b/i.test(line)) continue;
           const ocrDate = line.match(/(?:[0-9OoIl|cCeE]\s*){1,2}[/.\-]\s*(?:[0-9OoIl|cCeE]\s*){1,2}[/.\-]\s*(?:[0-9OoIl|&]\s*){2,4}/);
           if (!ocrDate) continue;
           const normalizedDate = ocrDate[0]
@@ -236,12 +482,13 @@ class OCRService {
       for (const candidateText of [text, ...alternativeTexts]) {
         const candidateLines = candidateText.split('\n').map((value) => value.trim()).filter(Boolean);
         for (let index = 0; index < candidateLines.length; index += 1) {
-          if (!hasFuzzyLabel(candidateLines[index], 'child')) continue;
-          const nearbyText = candidateLines.slice(index, index + 3).join(' ');
-          const possibleNames = nearbyText.match(/\b[A-Z][a-z]{2,}\b/g) || [];
-          const name = possibleNames.filter((word) => !/^(?:Child|Name|DOB|Date|Birth)$/i.test(word)).pop();
-          if (name) {
-            extractedData.childName = name;
+          const line = candidateLines[index];
+          if (!hasFuzzyLabel(line, 'child') || !hasFuzzyLabel(line, 'name')) continue;
+          const value = line.match(/(?:child\s*name|name\s*of\s*child)\s*[:\-]?\s*(.+)$/i)?.[1]?.trim();
+          const nextLine = candidateLines[index + 1] || '';
+          const name = value || (nextLine && !/^(?:age|gender|weight|height|date|parent|guardian|nutrition|health|beneficiary|anganwadi)\b/i.test(nextLine) ? nextLine : '');
+          if (name && !/^(?:child|name|information|details|field)$/i.test(name)) {
+            extractedData.childName = name.replace(/^[|,:;\-\s]+|[|,:;\-\s]+$/g, '').trim();
             break;
           }
         }
@@ -250,9 +497,9 @@ class OCRService {
     }
 
     const allTexts = [text, ...alternativeTexts];
-    const allLines = allTexts.flatMap((candidateText) => candidateText.split('\n')).map((line) => line.trim()).filter(Boolean);
+    const allLines = [...new Set(allTexts.flatMap((candidateText) => candidateText.split('\n')).map((line) => line.trim()).filter(Boolean))];
 
-    for (const line of allLines) {
+    for (const [lineIndex, line] of allLines.entries()) {
       if (!extractedData.beneficiaryId) {
         const idMatch = line.match(/(?:B[Ee]?[Nn]|[@8]N)[0OoeE6GgYy]{3,4}/);
         if (idMatch) {
@@ -279,13 +526,28 @@ class OCRService {
       if (!extractedData.nutritionDetails) {
         const nutritionIndex = words.findIndex((word) => editDistance(word.toLowerCase(), 'nutrition') <= 2);
         if (nutritionIndex >= 0) {
-          const value = words.slice(nutritionIndex + 1).pop();
+          const isNutritionSection = /\bnutrition\s+(?:notes?|details?)\b/i.test(line);
+          if (!isNutritionSection && !/\bnutrition\b[^:]{0,20}:/i.test(line)) continue;
+          const value = words.slice(nutritionIndex + 1).join(' ').replace(/^(?:notes?|details?)\s*:?\s*/i, '').trim();
+          const sectionLines = value ? [value] : [];
+          for (let nextIndex = lineIndex + 1; nextIndex < allLines.length; nextIndex += 1) {
+            const nextLine = allLines[nextIndex];
+            if (/^(?:child\s*name|age|weight|height|date|parent|guardian|health|beneficiary|anganwadi|child\s+nutrition\s+record)\b/i.test(nextLine)
+              || /\b\d+\s*years?\b|\b\d+(?:\.\d+)?\s*kg\b|\b\d+(?:\.\d+)?\s*cm\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/i.test(nextLine)) break;
+            const followingLine = allLines[nextIndex + 1] || '';
+            if (/^[A-Za-z][A-Za-z .'-]{0,30}$/.test(nextLine)
+              && /\b\d+\s*years?\b|\b\d+(?:\.\d+)?\s*kg\b|\b\d+(?:\.\d+)?\s*cm\b|\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/i.test(followingLine)) break;
+            sectionLines.push(nextLine);
+          }
+          const nutritionText = sectionLines.join(' ').replace(/\s+/g, ' ').trim();
           if (value) {
             const knownFoods = ['Egg', 'Milk', 'Rice', 'Dal', 'Pulses', 'Cereals', 'Vegetables', 'Fruits', 'Protein', 'Ragi', 'Wheat', 'Banana', 'Fish', 'Lentils'];
             const closestFood = knownFoods
               .map((food) => ({ food, distance: editDistance(value.toLowerCase(), food.toLowerCase()) }))
               .sort((left, right) => left.distance - right.distance)[0];
-            if (closestFood.distance <= 2) extractedData.nutritionDetails = closestFood.food;
+            extractedData.nutritionDetails = closestFood.distance <= 2 ? closestFood.food : nutritionText;
+          } else if (nutritionText) {
+            extractedData.nutritionDetails = nutritionText;
           }
         }
       }
@@ -303,6 +565,19 @@ class OCRService {
           }
         }
       }
+    }
+
+    // The table's value column is often recognized separately from its labels.
+    const tableValuesText = allTexts.find((candidateText) =>
+      /\b\d+\s*years?\b/i.test(candidateText)
+      && /\b\d+(?:\.\d+)?\s*kg\b/i.test(candidateText)
+      && /\b\d+(?:\.\d+)?\s*cm\b/i.test(candidateText)
+    ) || '';
+    if (tableValuesText) {
+      extractedData.age = tableValuesText.match(/\b\d+\s*years?\b/i)?.[0] || extractedData.age;
+      extractedData.weight = tableValuesText.match(/\b\d+(?:\.\d+)?\s*kg\b/i)?.[0] || extractedData.weight;
+      extractedData.height = tableValuesText.match(/\b\d+(?:\.\d+)?\s*cm\b/i)?.[0] || extractedData.height;
+      extractedData.recordDate = tableValuesText.match(/\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b/)?.[0] || extractedData.recordDate;
     }
 
     return extractedData;
