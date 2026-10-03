@@ -88,7 +88,7 @@ class AssistantActionService {
   static async buildQuery(message, user, history = []) {
     const source = `${history.filter((item) => item.role === 'user').slice(-2).map((item) => item.text).join(' ')} ${message}`;
     const operation = detectOperation(message) || detectOperation(source) || 'search';
-    const entity = detectEntity(source);
+    const entity = detectEntity(message) || detectEntity(source);
     const { matches } = await this.resolveBeneficiary(source, user);
     const dates = parseDate(source);
     if (operation === 'create' && dates.label === 'all available dates') {
@@ -100,8 +100,8 @@ class AssistantActionService {
     const weight = extractValue(source, /(\d+(?:\.\d+)?)\s*(?:kg|kilo|kilos|\u0d15\u0d3f\u0d32\u0d4b)/i);
     const height = extractValue(source, /(\d+(?:\.\d+)?)\s*(?:cm|centimet(?:er|re)|\u0d38\u0d46\u0d2e\u0d3f)/i);
     const status = has(source.toLowerCase(), ['absent', '\u0d35\u0d28\u0d4d\u0d28\u0d3f\u0d32\u0d4d\u0d32']) ? 'absent' : (has(source.toLowerCase(), ['half-day']) ? 'half-day' : 'present');
-    const risk = has(String(message).toLowerCase(), ['need attention', 'at risk', 'risk', 'missing growth', 'growth monitoring', 'incomplete vaccination', 'missing vaccination', 'missed follow-up', 'missing information', 'records are missing']);
-    const isReport = has(String(message).toLowerCase(), ['report', 'summary', 'monthly', '\u0d2e\u0d3e\u0d38']);
+    const risk = has(String(message).toLowerCase(), ['need attention', 'at risk', 'risk', 'missing growth', 'growth monitoring', 'incomplete vaccination', 'missing vaccination', 'missed follow-up', 'missing information', 'records are missing', 'നഷ്ടപ്പെട്ട കുത്തിവയ്പ്പ്', 'കുത്തിവയ്പ്പ് നഷ്ടപ്പെട്ട', 'മുടങ്ങിയ കുത്തിവയ്പ്പ്', 'കുത്തിവയ്പ്പ് മുടങ്ങിയ', 'എടുക്കാത്ത കുത്തിവയ്പ്പ്', 'കുത്തിവയ്പ്പ് എടുക്കാത്ത']);
+    const isReport = has(String(message).toLowerCase(), ['report', 'summary', 'monthly', 'റിപ്പോർട്ട്', 'റിപ്പോർട്ട', 'സംഗ്രഹം', '\u0d2e\u0d3e\u0d38']);
     const beneficiaryName = extractValue(source, /(?:child|beneficiary|student)\s+(?:named\s+)?([a-z][a-z -]{1,40})/i);
     const gender = extractValue(source, /\b(male|female|boy|girl)\b/i);
     const dob = extractValue(source, /(?:date of birth|dob)\s*[:=]?\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i);
@@ -116,15 +116,17 @@ class AssistantActionService {
 
   static async process(message, user, history = [], language = 'en-IN') {
     const lowerMessage = String(message || '').toLowerCase();
-    const dataQuestion = has(lowerMessage, ['show', 'find', 'latest', 'history', 'how many', 'which children', 'report', 'summary', 'attendance for', 'records', 'record', 'last month', 'this month', 'profile', 'details', 'missing', 'risk', '\u0d15\u0d3e\u0d23\u0d3f\u0d15\u0d4d\u0d15\u0d3e\u0d02']);
+    const malayalamDataQuestion = /റിപ്പോർട്ട|രേഖ|ഹാജർ|വളർച്ച|പോഷണം|കുത്തിവയ്പ്പ്/.test(lowerMessage);
+    const dataQuestion = has(lowerMessage, ['show', 'find', 'latest', 'history', 'how many', 'which children', 'report', 'summary', 'attendance for', 'records', 'record', 'last month', 'this month', 'profile', 'details', 'missing', 'risk', 'റിപ്പോർട്ട്', 'രേഖ', 'ഹാജർ', 'വളർച്ച', 'പോഷണം', 'കുത്തിവയ്പ്പ്', '\u0d15\u0d3e\u0d23\u0d3f\u0d15\u0d4d\u0d15\u0d3e\u0d02']);
     if (has(lowerMessage, ['how do i', 'where can i', 'how can i', 'what does this alert mean'])) return this.applicationHelp(lowerMessage);
-    if (!detectOperation(message) && !dataQuestion) return null;
+    if (!detectOperation(message) && !dataQuestion && !malayalamDataQuestion) return null;
     const query = await this.buildQuery(message, user, history);
     if (!query.entity && query.operation !== 'report' && !query.risk) return null;
     const ml = language === 'ml-IN' || isMalayalam(message);
     if (query.ambiguous) return { response: ml ? 'ഒരേ പേരുള്ള ഒന്നിലധികം ഗുണഭോക്താക്കളെ കണ്ടെത്തി. ദയവായി beneficiary ID നൽകുക.' : `I found ${query.matches.length} beneficiaries with that name. Please provide the beneficiary ID so I do not choose the wrong child.`, action: 'clarify', candidates: query.matches };
     if (['create', 'update', 'delete'].includes(query.operation)) return this.preview(query, user, ml);
     if (query.risk) return this.readRisk(query, user, ml);
+    if (/separately|each report|each category|one by one|individual reports|വേർതിരിച്ച്|ഓരോ റിപ്പോർട്ടും|ഒന്നൊന്നായി/i.test(lowerMessage)) return this.readAllReports(query, user, ml);
     return this.read(query, user, ml);
   }
 
@@ -209,11 +211,22 @@ class AssistantActionService {
     }
     if (query.operation === 'report') {
       const [attendance, health, nutrition, vaccination] = await Promise.all(Object.values(MODELS).map((Model) => Model.countDocuments({ ...beneficiaryFilter, date: range(query.dates.start, query.dates.end) })));
-      return { response: `${query.dates.label} summary from saved records: ${attendance} attendance, ${health} growth/health, ${nutrition} nutrition, and ${vaccination} vaccination records.`, action: 'result', report: { period: query.dates.label, attendance, health, nutrition, vaccination } };
+      const response = ml
+        ? `${query.dates.label}-ലെ സംഗ്രഹം: ഹാജർ ${attendance}, വളർച്ച/ആരോഗ്യം ${health}, പോഷണം ${nutrition}, കുത്തിവയ്പ്പ് ${vaccination} രേഖകൾ.`
+        : `${query.dates.label} summary from saved records: ${attendance} attendance, ${health} growth/health, ${nutrition} nutrition, and ${vaccination} vaccination records.`;
+      return { response, action: 'result', report: { period: query.dates.label, attendance, health, nutrition, vaccination } };
     }
     const Model = MODELS[query.entity];
     const records = Model ? await Model.find({ ...beneficiaryFilter, date: range(query.dates.start, query.dates.end) }).sort({ date: -1 }).lean() : [];
     if (!records.length) return { response: `No ${entityLabels[query.entity]} records were found for ${query.beneficiary ? query.beneficiary.name : 'the selected children'} in ${query.dates.label}.`, action: 'not_found', records: [] };
+    if (/detail|full|entire|specify|complete|വിശദ|പൂർണ്ണ/.test(query.source.toLowerCase())) {
+      const formatted = records.slice(0, 25).map((record) => {
+        const safe = this.formatRecord(record, map);
+        const values = Object.entries(safe).filter(([key]) => !['_id', 'beneficiary_id', 'beneficiary_name', '__v'].includes(key) && safe[key] !== null && safe[key] !== undefined && safe[key] !== '').map(([key, value]) => `${key.replaceAll('_', ' ')}: ${value}`).join('; ');
+        return `- ${values}`;
+      });
+      return { response: `${entityLabels[query.entity]} details for ${query.dates.label}:\n${formatted.join('\n')}`, action: 'result', records: records.map((record) => this.formatRecord(record, map)) };
+    }
     if (query.entity === 'attendance' && query.beneficiary) {
       const present = records.filter((record) => record.status === 'present').length;
       const absent = records.filter((record) => record.status === 'absent').length;
@@ -230,6 +243,18 @@ class AssistantActionService {
     return { response: `${entityLabels[query.entity]} records found: ${records.length} for ${query.beneficiary ? query.beneficiary.name : 'the selected children'} in ${query.dates.label}.`, action: 'result', records: records.map((record) => this.formatRecord(record, map)) };
   }
 
+  static async readAllReports(query, user, ml = false) {
+    const ids = await getScopedBeneficiaryIds(user);
+    const filter = { ...(query.beneficiary ? { beneficiary_id: query.beneficiary.beneficiary_id } : (ids ? { beneficiary_id: { $in: ids } } : {})), date: range(query.dates.start, query.dates.end) };
+    const entries = [['Attendance', Attendance], ['Growth / health', HealthRecord], ['Nutrition', NutritionRecord], ['Vaccination', Vaccination]];
+    const groups = await Promise.all(entries.map(async ([label, Model]) => ({ label, records: await Model.find(filter).sort({ date: -1 }).limit(50).lean() })));
+    const lines = groups.map(({ label, records }) => `${label}: ${records.length} record${records.length === 1 ? '' : 's'}${records.length ? ` (${records.slice(0, 10).map((record) => iso(record.date)).join(', ')})` : ''}`);
+    const response = ml
+      ? `റിപ്പോർട്ടുകൾ വേർതിരിച്ച് (${query.dates.label}):\n${groups.map(({ label, records }) => { const names = { Attendance: 'ഹാജർ', 'Growth / health': 'വളർച്ച / ആരോഗ്യം', Nutrition: 'പോഷണം', Vaccination: 'കുത്തിവയ്പ്പ്' }; const dates = records.length ? ` (${records.slice(0, 10).map((record) => iso(record.date)).join(', ')})` : ''; return `${names[label]}: ${records.length} രേഖ${records.length === 1 ? '' : 'കൾ'}${dates}`; }).join('\n')}`
+      : `Reports separately for ${query.dates.label}:\n${lines.join('\n')}`;
+    return { response, action: 'result', report: Object.fromEntries(groups.map(({ label, records }) => [label, records])) };
+  }
+
   static async readRisk(query, user, ml) {
     const ids = await getScopedBeneficiaryIds(user);
     const filter = ids ? { beneficiary_id: { $in: ids } } : {};
@@ -243,7 +268,7 @@ class AssistantActionService {
       const monitoredSet = new Set(monitored);
       category = 'children without growth monitoring';
       result = children.filter((child) => !monitoredSet.has(child.beneficiary_id)).map((child) => ({ beneficiary_id: child.beneficiary_id, name: child.name, indicator: 'No growth record in the selected period' }));
-    } else if (has(text, ['incomplete vaccination', 'missing vaccination'])) {
+    } else if (has(text, ['incomplete vaccination', 'missing vaccination', 'നഷ്ടപ്പെട്ട കുത്തിവയ്പ്പ്', 'കുത്തിവയ്പ്പ് നഷ്ടപ്പെട്ട', 'മുടങ്ങിയ കുത്തിവയ്പ്പ്', 'കുത്തിവയ്പ്പ് മുടങ്ങിയ', 'എടുക്കാത്ത കുത്തിവയ്പ്പ്', 'കുത്തിവയ്പ്പ് എടുക്കാത്ത'])) {
       const vaccinated = await Vaccination.find(filter).distinct('beneficiary_id');
       const vaccinatedSet = new Set(vaccinated);
       category = 'children without vaccination records';
@@ -259,8 +284,9 @@ class AssistantActionService {
       category = 'children with recorded growth or nutrition indicators requiring review';
       result = [...latest.entries()].filter(([, record]) => record.health_status && record.health_status !== 'normal' || record.nutrition_status && !['normal', 'healthy'].includes(record.nutrition_status)).map(([beneficiary_id, record]) => ({ beneficiary_id, name: names.get(beneficiary_id), indicator: record.health_status || record.nutrition_status, date: record.date }));
     }
-    if (!result.length) return { response: `No ${category} were identified from the saved records.`, action: 'result', records: [], calculated: true };
-    return { response: `${category}: ${result.length}. These are database-based indicators, not diagnoses. Please review them with the responsible worker or health professional.`, action: 'result', records: result, calculated: true };
+    if (!result.length) return { response: ml ? 'സേവ് ചെയ്ത രേഖകളിൽ നിന്ന് നഷ്ടപ്പെട്ട കുത്തിവയ്പ്പ് രേഖകളുള്ള കുട്ടികളെ കണ്ടെത്താനായില്ല.' : `No ${category} were identified from the saved records.`, action: 'result', records: [], calculated: true };
+    const matchedNames = result.map((item) => item.name || item.beneficiary_name || item.beneficiary_id).join(', ');
+    return { response: ml ? `കുത്തിവയ്പ്പ് രേഖകൾ അപൂർണ്ണമായ കുട്ടികൾ: ${result.length}\n${matchedNames}\nഇത് ഡാറ്റാബേസ് രേഖകളെ അടിസ്ഥാനമാക്കിയുള്ള സൂചന മാത്രമാണ്; ആരോഗ്യപ്രവർത്തകനുമായി പരിശോധിക്കുക.` : `${category}: ${result.length}. These are database-based indicators, not diagnoses. Please review them with the responsible worker or health professional.`, action: 'result', records: result, calculated: true };
   }
 
   static async confirm(draft, user) {

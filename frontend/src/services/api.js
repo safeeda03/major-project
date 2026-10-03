@@ -132,6 +132,7 @@ export const ocrAPI = {
     return request(`/ocr/latest?${query.toString()}`);
   },
   getById: (id) => request(`/ocr/${id}`),
+  delete: (id) => request(`/ocr/${id}`, { method: 'DELETE' }),
   retry: (id) => request(`/ocr/${id}/retry`, { method: 'POST' }),
   confirm: (id, review, options) => request(`/ocr/${id}/confirm`, { method: 'POST', body: JSON.stringify({ review, options }) }),
   openOriginal: async (id) => {

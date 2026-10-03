@@ -298,6 +298,21 @@ app.post('/api/ocr/:id/confirm', authenticate, async (req, res) => {
   }
 });
 
+app.delete('/api/ocr/:id', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid OCR document ID.' });
+    const OcrDocument = require('./models/OcrDocument');
+    const document = await OcrDocument.findById(req.params.id);
+    if (!document) return res.status(404).json({ message: 'OCR document not found.' });
+    if (!canAccessOcrDocument(req.user, document)) return res.status(403).json({ message: 'You cannot delete this OCR document.' });
+    if (document.storage_path) fs.promises.unlink(document.storage_path).catch(() => {});
+    await document.deleteOne();
+    res.json({ message: 'OCR history item deleted.' });
+  } catch {
+    res.status(500).json({ message: 'Could not delete this OCR history item.' });
+  }
+});
+
 app.get('/api/ocr/:id', authenticate, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid OCR document ID.' });
