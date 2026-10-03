@@ -35,15 +35,15 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.pdf']);
-    const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+    const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.txt']);
+    const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'text/plain']);
     const extension = path.extname(file.originalname).toLowerCase();
 
     if (allowedExtensions.has(extension) && allowedMimeTypes.has(file.mimetype)) {
       return cb(null, true);
     }
 
-    const error = new Error('Only PDF, JPG, PNG, and WebP files are supported for OCR.');
+    const error = new Error('Only TXT, PDF, JPG, PNG, and WebP files are supported for OCR.');
     error.statusCode = 400;
     return cb(error);
   }
@@ -104,18 +104,28 @@ app.post('/api/ocr/process', upload.single('document'), async (req, res) => {
 });
 
 // Chatbot Routes
-app.post('/api/chatbot/message', async (req, res) => {
+app.post('/api/chatbot/message', authenticate, async (req, res) => {
   try {
     const { message, history, language } = req.body;
     const ChatbotService = require('./services/chatbotService');
-    const response = await ChatbotService.processMessage(message, history, language);
+    const response = await ChatbotService.processMessage(message, history, language, req.user);
     res.json(response);
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message || 'Chatbot error' });
   }
 });
 
-app.post('/api/chatbot/voice', voiceUpload.single('audio'), async (req, res) => {
+app.post('/api/chatbot/confirm', authenticate, async (req, res) => {
+  try {
+    const ChatbotService = require('./services/chatbotService');
+    const response = await ChatbotService.confirmAction(req.body.draft, req.user);
+    res.json(response);
+  } catch (error) {
+    res.status(error.statusCode || 400).json({ message: error.message || 'Could not complete the assistant action.' });
+  }
+});
+
+app.post('/api/chatbot/voice', authenticate, voiceUpload.single('audio'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No audio recording was uploaded.' });
     const SpeechService = require('./services/speechService');

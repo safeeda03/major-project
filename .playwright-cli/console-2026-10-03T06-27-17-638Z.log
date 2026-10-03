@@ -1,0 +1,2 @@
+[    3625ms] The requested module '/src/services/api.js' does not provide an export named 'reportAssistantAPI'
+[    3629ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://127.0.0.1:5173/favicon.ico:0

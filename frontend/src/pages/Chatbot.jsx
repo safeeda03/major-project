@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../context/AuthContext';
-import { chatbotAPI, reportAssistantAPI } from '../services/api';
+import { chatbotAPI } from '../services/api';
 
 const QUICK_QUESTIONS = [
   'What are the signs of malnutrition?',

@@ -1,0 +1,82 @@
+- generic [ref=e23]:
+  - navigation [ref=e24]:
+    - heading "PoshanAI" [level=1] [ref=e26]
+    - generic [ref=e27]:
+      - link "Dashboard" [ref=e28] [cursor=pointer]:
+        - /url: /worker-dashboard
+      - link "Beneficiaries" [ref=e29] [cursor=pointer]:
+        - /url: /beneficiaries
+      - link "Reports" [ref=e30] [cursor=pointer]:
+        - /url: /reports
+      - link "Chatbot" [ref=e31] [cursor=pointer]:
+        - /url: /chatbot
+      - generic [ref=e32]: Welcome, Test Worker
+      - button "Logout" [ref=e33] [cursor=pointer]
+  - generic [ref=e34]:
+    - list [ref=e36]:
+      - listitem [ref=e37]:
+        - link "Dashboard" [ref=e38] [cursor=pointer]:
+          - /url: /worker-dashboard
+      - listitem [ref=e39]:
+        - link "Beneficiaries" [ref=e40] [cursor=pointer]:
+          - /url: /beneficiaries
+      - listitem [ref=e41]:
+        - link "Health Records" [ref=e42] [cursor=pointer]:
+          - /url: /health
+      - listitem [ref=e43]:
+        - link "Nutrition" [ref=e44] [cursor=pointer]:
+          - /url: /nutrition
+      - listitem [ref=e45]:
+        - link "Vaccination" [ref=e46] [cursor=pointer]:
+          - /url: /vaccination
+      - listitem [ref=e47]:
+        - link "Attendance" [ref=e48] [cursor=pointer]:
+          - /url: /attendance
+      - listitem [ref=e49]:
+        - link "OCR Upload" [ref=e50] [cursor=pointer]:
+          - /url: /ocr
+      - listitem [ref=e51]:
+        - link "Alerts" [ref=e52] [cursor=pointer]:
+          - /url: /alerts
+      - listitem [ref=e53]:
+        - link "Reports" [ref=e54] [cursor=pointer]:
+          - /url: /reports
+    - main [ref=e55]:
+      - heading "Worker Dashboard" [level=2] [ref=e56]
+      - generic [ref=e57]:
+        - link "View Total Beneficiaries" [ref=e58] [cursor=pointer]:
+          - /url: /beneficiaries
+          - heading "Total Beneficiaries" [level=3] [ref=e59]
+          - paragraph [ref=e60]: "0"
+          - paragraph [ref=e61]: Children registered
+        - link "View Today's Attendance" [ref=e62] [cursor=pointer]:
+          - /url: /attendance
+          - heading "Today's Attendance" [level=3] [ref=e63]
+          - paragraph [ref=e64]: "0"
+          - paragraph [ref=e65]: 0 records today
+        - link "View Vaccination Due" [ref=e66] [cursor=pointer]:
+          - /url: /vaccination
+          - heading "Vaccination Due" [level=3] [ref=e67]
+          - paragraph [ref=e68]: "0"
+          - paragraph [ref=e69]: Pending vaccinations
+        - link "View Health Alerts" [ref=e70] [cursor=pointer]:
+          - /url: /health
+          - heading "Health Alerts" [level=3] [ref=e71]
+          - paragraph [ref=e72]: "0"
+          - paragraph [ref=e73]: Latest non-normal records
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - heading "Today's Attendance" [level=3] [ref=e76]
+          - list [ref=e77]:
+            - listitem [ref=e78]: No attendance recorded for today.
+        - generic [ref=e79]:
+          - heading "Pending Vaccinations" [level=3] [ref=e80]
+          - list [ref=e81]:
+            - listitem [ref=e82]: No vaccinations are pending.
+      - generic [ref=e84]:
+        - heading "Health Alerts" [level=3] [ref=e85]
+        - list [ref=e86]:
+          - listitem [ref=e87]: No health alerts in current records.
+      - generic [ref=e88]:
+        - heading "Monthly Attendance Trend" [level=3] [ref=e90]
+        - heading "Nutrition Status Distribution" [level=3] [ref=e94]

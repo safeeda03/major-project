@@ -94,6 +94,19 @@ export const reportAPI = {
   getAlertDetails: (type) => request(`/reports/alerts/${type}`)
 };
 
+// OCR uses this API to turn extracted text into a worker-reviewed report.
+// The server validates the worker session before either previewing or saving.
+export const reportAssistantAPI = {
+  preview: (message, language = 'en-IN', draft = null, reportType = null) => request('/reports/assistant/preview', {
+    method: 'POST',
+    body: JSON.stringify({ message, language, draft, reportType })
+  }),
+  confirm: (draft) => request('/reports/assistant/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ draft })
+  })
+};
+
 // OCR API
 export const ocrAPI = {
   processDocument: async (file) => {
@@ -135,16 +148,15 @@ const retiredChatbotMock = {
 */
 
 export const chatbotAPI = {
-  sendMessage: async (message, history = [], language = 'en-IN') => {
-    const response = await fetch('/api/chatbot/message', {
+  sendMessage: (message, history = [], language = 'en-IN') => request('/chatbot/message', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, history, language }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || 'Could not reach the AI assistant');
-    return data;
-  },
+    }),
+
+  confirmAction: (draft) => request('/chatbot/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ draft }),
+  }),
 
   transcribeVoice: async (audioBlob, language = 'en-IN') => {
     const formData = new FormData();
