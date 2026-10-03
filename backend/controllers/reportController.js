@@ -136,7 +136,11 @@ exports.getCentreStatistics = async (req, res) => {
       return groups;
     }, new Map());
 
-    const statistics = [...beneficiariesByCentre.entries()].map(([centre_id, centreBeneficiaries]) => {
+    // Statistics represent registered centres only. Orphan beneficiary centre IDs
+    // should not be presented as additional Anganwadi centres.
+    const statistics = [...beneficiariesByCentre.entries()]
+      .filter(([centre_id]) => centreNames.has(centre_id))
+      .map(([centre_id, centreBeneficiaries]) => {
       const beneficiaryIds = new Set(centreBeneficiaries.map((beneficiary) => beneficiary.beneficiary_id));
       const healthRisk = centreBeneficiaries.filter((beneficiary) => {
         const record = latestHealth.get(beneficiary.beneficiary_id);
@@ -160,7 +164,7 @@ exports.getCentreStatistics = async (req, res) => {
         pendingVaccinations: vaccinations.filter((record) => beneficiaryIds.has(record.beneficiary_id)).length,
         attendanceRate: attendanceSummary.total ? Math.round((attendanceSummary.units / attendanceSummary.total) * 100) : null
       };
-    }).sort((a, b) => a.centreName.localeCompare(b.centreName));
+      }).sort((a, b) => a.centreName.localeCompare(b.centreName));
 
     res.json(statistics);
   } catch (error) {

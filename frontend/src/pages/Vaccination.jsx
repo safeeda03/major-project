@@ -17,19 +17,27 @@ const Vaccination = () => {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [linkedChild, setLinkedChild] = useState(null);
+  const [records, setRecords] = useState([]);
+  const [recordsLoading, setRecordsLoading] = useState(false);
 
   useEffect(() => {
     if (!isParent) return;
     const loadChild = async () => {
+      setRecordsLoading(true);
+      setError('');
       try {
         const children = await beneficiaryAPI.getByParent(user?.id || user?.user_id || user?._id);
         const child = children[0] || null;
         setLinkedChild(child);
-        if (child) setFormData((current) => ({ ...current, beneficiary_id: child.beneficiary_id }));
+        if (child) setRecords(await vaccinationAPI.getByBeneficiary(child.beneficiary_id));
+        else setRecords([]);
       } catch (err) { setError(err.message || 'Could not load the linked child profile.'); }
+      finally { setRecordsLoading(false); }
     };
     loadChild();
   }, [isParent, user]);
+
+  const sortedRecords = [...records].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   const handleChange = (e) => {
     setFormData({
@@ -67,7 +75,22 @@ const Vaccination = () => {
         <Sidebar role={isParent ? 'parent' : 'worker'} />
         <main className="main-content">
           <h2>Vaccination Records</h2>
-          <div className="form-container">
+          {isParent ? <div className="form-container records-wide">
+            <h3>Vaccination Records Added by Your Anganwadi Worker</h3>
+            <p>These records are view-only. Contact your Anganwadi worker to add or correct a vaccination record.</p>
+            {error && <div className="error-message">{error}</div>}
+            {recordsLoading ? <p>Loading vaccination records...</p> : !linkedChild ? <p>No child profile is linked to this parent account.</p> : <>
+              <p><strong>Child:</strong> {linkedChild.name} ({linkedChild.beneficiary_id})</p>
+              <div className="records-table-wrapper"><table className="records-table"><thead><tr><th>Vaccine</th><th>Vaccination date</th><th>Next due date</th><th>Status</th></tr></thead><tbody>
+                {sortedRecords.length ? sortedRecords.map((record) => {
+                  const dueDate = record.next_due_date ? new Date(record.next_due_date) : null;
+                  const today = new Date(); today.setHours(0, 0, 0, 0);
+                  const status = record.completed ? 'Completed' : dueDate && dueDate < today ? 'Overdue' : 'Pending';
+                  return <tr key={record._id}><td>{record.vaccine}</td><td>{record.date ? new Date(record.date).toLocaleDateString() : '—'}</td><td>{dueDate ? dueDate.toLocaleDateString() : '—'}</td><td>{status}</td></tr>;
+                }) : <tr><td colSpan="4">No vaccination records have been added for this child.</td></tr>}
+              </tbody></table></div>
+            </>}
+          </div> : <div className="form-container">
             <h3>Add Vaccination Record</h3>
             <form onSubmit={handleSubmit}>
               <div className="form-group">
@@ -119,7 +142,7 @@ const Vaccination = () => {
               {message && <div className="success-message">{message}</div>}
               {error && <div className="error-message">{error}</div>}
             </form>
-          </div>
+          </div>}
         </main>
       </div>
     </div>

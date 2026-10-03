@@ -45,7 +45,7 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/beneficiaries" element={
-            <ProtectedRoute allowedRoles={['worker']}>
+            <ProtectedRoute allowedRoles={['worker', 'supervisor']}>
               <Beneficiary />
             </ProtectedRoute>
           } />

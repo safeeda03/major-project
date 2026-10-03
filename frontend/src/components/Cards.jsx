@@ -13,14 +13,18 @@ const Cards = ({ title, value, icon, color }) => {
   );
 };
 
-export const StatCard = ({ title, value, subtitle, to }) => {
+export const StatCard = ({ title, value, subtitle, to, anchor }) => {
   const content = <>
     <h3>{title}</h3>
     <p className="stat-value">{value}</p>
     <p className="stat-subtitle">{subtitle}</p>
   </>;
 
-  return to ? (
+  return anchor ? (
+    <a href={`#${anchor}`} className="stat-card stat-card-link" aria-label={`View ${title}`}>
+      {content}
+    </a>
+  ) : to ? (
     <Link to={to} className="stat-card stat-card-link" aria-label={`View ${title}`}>
       {content}
     </Link>

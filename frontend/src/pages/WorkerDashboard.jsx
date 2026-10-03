@@ -77,8 +77,8 @@ const WorkerDashboard = () => {
   const stats = [
     { title: 'Total Beneficiaries', value: data.beneficiaries.length, subtitle: 'Children registered', to: '/beneficiaries' },
     { title: 'Today\'s Attendance', value: presentCount, subtitle: `${todayAttendance.length} records today`, to: '/attendance' },
-    { title: 'Vaccination Due', value: data.dueVaccinations.length, subtitle: 'Pending vaccinations', to: '/vaccination' },
-    { title: 'Health Alerts', value: healthAlerts.length, subtitle: 'Latest non-normal records', to: '/health' }
+    { title: 'Vaccination Due', value: data.dueVaccinations.length, subtitle: 'Pending vaccinations', anchor: 'pending-vaccinations' },
+    { title: 'Health Alerts', value: healthAlerts.length, subtitle: 'Latest non-normal records', anchor: 'health-alerts' }
   ];
 
   return (
@@ -104,7 +104,7 @@ const WorkerDashboard = () => {
                 )) : <li>No attendance recorded for today.</li>}
               </ul>
             </div>
-            <div className="section">
+            <div className="section" id="pending-vaccinations" tabIndex="-1">
               <h3>Pending Vaccinations</h3>
               <ul className="task-list">
                 {data.dueVaccinations.length ? data.dueVaccinations.map((record) => (
@@ -115,7 +115,7 @@ const WorkerDashboard = () => {
           </div>
 
           <div className="dashboard-sections">
-            <div className="section">
+            <div className="section" id="health-alerts" tabIndex="-1">
               <h3>Health Alerts</h3>
               <ul className="task-list">
                 {healthAlerts.length ? healthAlerts.map((record) => (

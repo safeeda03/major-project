@@ -9,6 +9,9 @@ const SupervisorDashboard = () => {
   const [alerts, setAlerts] = useState([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [alertsError, setAlertsError] = useState('');
+  const [centreStats, setCentreStats] = useState([]);
+  const [centreStatsLoading, setCentreStatsLoading] = useState(true);
+  const [centreStatsError, setCentreStatsError] = useState('');
 
   useEffect(() => {
     const loadAlerts = async () => {
@@ -36,11 +39,24 @@ const SupervisorDashboard = () => {
     loadAlerts();
   }, []);
   const stats = [
-    { title: 'Total Centres', value: '25', subtitle: 'Under supervision' },
-    { title: 'Total Beneficiaries', value: '3,750', subtitle: 'Across all centres' },
-    { title: 'High Risk Areas', value: '3', subtitle: 'Require attention' },
-    { title: 'This Month Reports', value: '45', subtitle: 'Generated' }
+    { title: 'Total Centres', value: centreStatsLoading ? '…' : String(centreStats.length), subtitle: 'Under supervision', to: '/statistics' },
+    { title: 'Total Beneficiaries', value: '45', subtitle: 'Across all centres', to: '/beneficiaries' },
+    { title: 'High Risk Areas', value: '3', subtitle: 'Require attention', to: '/alerts' },
+    { title: 'This Month Reports', value: '45', subtitle: 'Generated', to: '/reports' }
   ];
+
+  useEffect(() => {
+    const loadCentreStats = async () => {
+      try {
+        setCentreStats(await reportAPI.getCentreStatistics());
+      } catch (error) {
+        setCentreStatsError(error.message || 'Could not load centre statistics.');
+      } finally {
+        setCentreStatsLoading(false);
+      }
+    };
+    loadCentreStats();
+  }, []);
 
   return (
     <div className="dashboard-page">
@@ -57,32 +73,37 @@ const SupervisorDashboard = () => {
           <div className="dashboard-sections">
             <div className="section">
               <h3>Centre Performance</h3>
+              <p>Live statistics for each saved Anganwadi centre.</p>
               <div className="performance-table-wrapper">
               <table className="performance-table">
                 <thead>
                   <tr>
                     <th>Centre Name</th>
+                    <th>Beneficiaries</th>
                     <th>Attendance %</th>
-                    <th>Health Status</th>
-                    <th>Nutrition Status</th>
+                    <th>Health Risks</th>
+                    <th>Nutrition Risks</th>
+                    <th>Vaccinations Due</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td>Anganwadi Centre A</td>
-                    <td>92%</td>
-                    <td>Good</td>
-                    <td>Satisfactory</td>
-                  </tr>
-                  <tr>
-                    <td>Anganwadi Centre B</td>
-                    <td>88%</td>
-                    <td>Moderate</td>
-                    <td>Needs Improvement</td>
-                  </tr>
+                  {centreStatsLoading && <tr><td colSpan="6">Loading centre statistics…</td></tr>}
+                  {centreStatsError && <tr><td colSpan="6">{centreStatsError}</td></tr>}
+                  {!centreStatsLoading && !centreStatsError && centreStats.map((centre) => (
+                    <tr key={centre.centre_id}>
+                      <td>{centre.centreName}</td>
+                      <td>{centre.beneficiaries}</td>
+                      <td>{centre.attendanceRate === null ? 'No records' : `${centre.attendanceRate}%`}</td>
+                      <td>{centre.healthRisk}</td>
+                      <td>{centre.nutritionRisk}</td>
+                      <td>{centre.pendingVaccinations}</td>
+                    </tr>
+                  ))}
+                  {!centreStatsLoading && !centreStatsError && centreStats.length === 0 && <tr><td colSpan="6">No centre statistics are available.</td></tr>}
                 </tbody>
               </table>
               </div>
+              <Link className="alert-detail-link" to="/statistics">View all centre statistics →</Link>
             </div>
             <div className="section">
               <h3>Alerts & Notifications</h3>

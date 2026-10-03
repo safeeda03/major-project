@@ -10,6 +10,7 @@ const labels = { child: 'Child', pregnant_woman: 'Pregnant woman', lactating_mot
 
 export default function Beneficiary() {
   const { user } = useAuth();
+  const isSupervisor = user?.role === 'supervisor';
   const [form, setForm] = useState(blank());
   const [items, setItems] = useState([]);
   const [query, setQuery] = useState('');
@@ -29,18 +30,19 @@ export default function Beneficiary() {
   };
   const edit = (item) => { setEditing(item._id); setForm({ ...blank(), ...item, dob: item.dob?.slice(0, 10) || '' }); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const remove = async (item) => { if (!window.confirm(`Remove ${item.name} and related records?`)) return; try { await beneficiaryAPI.delete(item._id); setMessage(`${item.name} removed.`); await load(); } catch (err) { setError(err.message); } };
-  return <div className="page"><Navbar /><div className="page-content"><Sidebar role="worker" /><main className="main-content">
-    <h2>Beneficiary Management</h2>
-    <div className="form-container"><h3>{editing ? 'Update Beneficiary' : 'Register Beneficiary'}</h3><form onSubmit={submit}>
+  return <div className="page"><Navbar /><div className="page-content"><Sidebar role={isSupervisor ? 'supervisor' : 'worker'} /><main className="main-content">
+    <h2>{isSupervisor ? 'All Beneficiaries' : 'Beneficiary Management'}</h2>
+    {isSupervisor && <p>Beneficiary records across all saved Anganwadi centres.</p>}
+    {!isSupervisor && <div className="form-container"><h3>{editing ? 'Update Beneficiary' : 'Register Beneficiary'}</h3><form onSubmit={submit}>
       <Field label="Beneficiary type"><select name="beneficiary_type" value={form.beneficiary_type} onChange={change}><option value="child">Child</option><option value="pregnant_woman">Pregnant woman</option><option value="lactating_mother">Lactating mother</option><option value="elderly_person">Elderly person</option></select></Field>
       <Field label="Full name"><input name="name" value={form.name} onChange={change} required /></Field><Field label="Date of birth"><input type="date" name="dob" value={form.dob} onChange={change} required /></Field>
       <Field label="Gender"><select name="gender" value={form.gender} onChange={change} required><option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option></select></Field>
       <p className="form-hint">Assigned centre: <strong>{user?.centreId || 'Not assigned'}</strong>. Parents create their own accounts using the Beneficiary ID after registration.</p>
       <Field label="Contact phone (optional)"><input type="tel" name="contact_phone" value={form.contact_phone} onChange={change} /></Field><Field label="Notes / observations"><textarea name="notes" value={form.notes} onChange={change} /></Field>
       <button className="submit-btn" disabled={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Register beneficiary'}</button>{editing && <button type="button" className="secondary-btn" onClick={reset}>Cancel</button>}
-    </form>{message && <div className="success-message">{message}</div>}{error && <div className="error-message">{error}</div>}</div>
+    </form>{message && <div className="success-message">{message}</div>}{error && <div className="error-message">{error}</div>}</div>}
     <div className="form-container records-container records-wide"><h3>Registered Beneficiaries ({items.length})</h3><input className="search-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, ID, centre or type" />
-      <div className="records-table-wrapper"><table className="records-table"><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Date of birth</th><th>Centre</th><th>Actions</th></tr></thead><tbody>{shown.length ? shown.map((x) => <tr key={x._id}><td>{x.beneficiary_id}</td><td><Link className="child-link" to={`/beneficiaries/${x._id}`}>{x.name}</Link></td><td>{labels[x.beneficiary_type] || 'Child'}</td><td>{x.dob ? new Date(x.dob).toLocaleDateString() : '—'}</td><td>{x.anganwadi_id}</td><td className="row-actions"><button type="button" className="edit-btn" onClick={() => edit(x)}>Edit</button><button type="button" className="delete-btn" onClick={() => remove(x)}>Delete</button></td></tr>) : <tr><td colSpan="6">No matching beneficiaries.</td></tr>}</tbody></table></div>
+      <div className="records-table-wrapper"><table className="records-table"><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Date of birth</th><th>Centre</th>{!isSupervisor && <th>Actions</th>}</tr></thead><tbody>{shown.length ? shown.map((x) => <tr key={x._id}><td>{x.beneficiary_id}</td><td>{isSupervisor ? x.name : <Link className="child-link" to={`/beneficiaries/${x._id}`}>{x.name}</Link>}</td><td>{labels[x.beneficiary_type] || 'Child'}</td><td>{x.dob ? new Date(x.dob).toLocaleDateString() : '—'}</td><td>{x.anganwadi_id}</td>{!isSupervisor && <td className="row-actions"><button type="button" className="edit-btn" onClick={() => edit(x)}>Edit</button><button type="button" className="delete-btn" onClick={() => remove(x)}>Delete</button></td>}</tr>) : <tr><td colSpan={isSupervisor ? '5' : '6'}>No matching beneficiaries.</td></tr>}</tbody></table></div>
     </div>
   </main></div></div>;
 }
