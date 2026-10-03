@@ -135,6 +135,7 @@ class OCRService {
       let confidence = null;
       let alternativeTexts = [];
       let provider = 'tesseract';
+      let quality = { warnings: [] };
 
       if (isText) {
         rawText = fs.readFileSync(file.path, 'utf8').replace(/\r/g, '').trim();
@@ -144,7 +145,9 @@ class OCRService {
         const pdf = await pdfParse(fs.readFileSync(file.path));
         rawText = pdf.text.replace(/\r/g, '').trim();
         provider = 'pdf-text';
+        quality = { pageCount: pdf.numpages || 1, warnings: [] };
       } else {
+        quality = await this.inspectImageQuality(file.path);
         const cloudResult = await this.recognizeWithGoogleVision(file.path);
         if (cloudResult) {
           rawText = cloudResult.text;
@@ -158,6 +161,26 @@ class OCRService {
               ...recognitionOptions,
               tessedit_pageseg_mode: String(pageSegMode),
             }));
+          }
+
+          // Preserve the original image and run an additional, non-destructive
+          // enhanced pass. Sharp rotates according to EXIF metadata, normalizes
+          // contrast, reduces monochrome noise, and sharpens text edges.
+          if (sharp) {
+            try {
+              const enhanced = await sharp(file.path)
+                .rotate()
+                .grayscale()
+                .normalize()
+                .modulate({ brightness: 1.04 })
+                .sharpen()
+                .png()
+                .toBuffer();
+              attempts.push(await Tesseract.recognize(enhanced, 'eng', recognitionOptions));
+              quality.preprocessing = ['EXIF rotation correction', 'contrast normalization', 'brightness adjustment', 'noise reduction', 'text sharpening'];
+            } catch (error) {
+              quality.warnings.push('Image enhancement could not be applied; the original image was used.');
+            }
           }
 
           // Full-page OCR can skip text inside bordered tables. A focused pass
@@ -225,6 +248,13 @@ class OCRService {
       // Keep the highest-ranked OCR pass intact. Merging every segmentation
       // pass duplicates labels and injects partial garbage into the report.
       const completeText = (rawText || mergeOCRText(alternativeTexts)).replace(SAMPLE_FOOTER_PATTERN, '').trim();
+      if (!completeText && !isText) {
+        const error = new Error(isPdf
+          ? 'No readable text was found in this PDF. For a scanned PDF, upload a clear image of each page.'
+          : 'No readable text was found. Upload a sharper, well-lit image with the document filling the frame.');
+        error.statusCode = 422;
+        throw error;
+      }
       const extractedData = this.extractDataFromText(completeText);
       const flexibleResult = this.analyzeText(completeText, extractedData);
       const reportCandidates = splitReportText(completeText).map((candidate) => {
@@ -244,6 +274,7 @@ class OCRService {
           rawText: completeText,
           confidence,
           provider,
+          quality,
           needsVerification: true,
         },
         message: completeText
@@ -259,6 +290,25 @@ class OCRService {
       error.statusCode = 422;
       throw error;
     }
+  }
+
+  static async inspectImageQuality(filePath) {
+    const quality = { warnings: [] };
+    if (!sharp) return quality;
+    try {
+      const image = sharp(filePath).rotate();
+      const [metadata, stats] = await Promise.all([image.metadata(), image.stats()]);
+      quality.width = metadata.width || null;
+      quality.height = metadata.height || null;
+      if (!metadata.width || !metadata.height || Math.min(metadata.width, metadata.height) < 700) {
+        quality.warnings.push('This image has low resolution. A clearer, closer photo may improve OCR results.');
+      }
+      const deviation = (stats.channels || []).reduce((sum, channel) => sum + (channel.stdev || 0), 0) / Math.max((stats.channels || []).length, 1);
+      if (deviation < 18) quality.warnings.push('This image appears low contrast or washed out. Verify extracted values carefully.');
+    } catch {
+      quality.warnings.push('Image quality could not be measured. Verify all extracted fields carefully.');
+    }
+    return quality;
   }
 
   static async recognizeWithGoogleVision(filePath) {

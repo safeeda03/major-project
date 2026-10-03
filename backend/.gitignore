@@ -21,6 +21,7 @@ dist-ssr
 
 # Short-lived OCR uploads are deleted after processing.
 uploads/
+private-uploads/
 .cache/
 
 # Editor directories and files

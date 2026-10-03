@@ -1,0 +1,100 @@
+- generic [ref=f1e23]:
+  - navigation [ref=f1e24]:
+    - heading "PoshanAI" [level=1] [ref=f1e26]
+    - generic [ref=f1e27]:
+      - link "Dashboard" [ref=f1e28] [cursor=pointer]:
+        - /url: /worker-dashboard
+      - link "Beneficiaries" [ref=f1e29] [cursor=pointer]:
+        - /url: /beneficiaries
+      - link "Reports" [ref=f1e30] [cursor=pointer]:
+        - /url: /reports
+      - link "Chatbot" [ref=f1e31] [cursor=pointer]:
+        - /url: /chatbot
+      - generic [ref=f1e32]: Welcome, Rajesh Kumar
+      - button "Logout" [ref=f1e33] [cursor=pointer]
+  - generic [ref=f1e34]:
+    - list [ref=f1e36]:
+      - listitem [ref=f1e37]:
+        - link "Dashboard" [ref=f1e38] [cursor=pointer]:
+          - /url: /worker-dashboard
+      - listitem [ref=f1e39]:
+        - link "Beneficiaries" [ref=f1e40] [cursor=pointer]:
+          - /url: /beneficiaries
+      - listitem [ref=f1e41]:
+        - link "Health Records" [ref=f1e42] [cursor=pointer]:
+          - /url: /health
+      - listitem [ref=f1e43]:
+        - link "Nutrition" [ref=f1e44] [cursor=pointer]:
+          - /url: /nutrition
+      - listitem [ref=f1e45]:
+        - link "Vaccination" [ref=f1e46] [cursor=pointer]:
+          - /url: /vaccination
+      - listitem [ref=f1e47]:
+        - link "Attendance" [ref=f1e48] [cursor=pointer]:
+          - /url: /attendance
+      - listitem [ref=f1e49]:
+        - link "OCR Upload" [ref=f1e50] [cursor=pointer]:
+          - /url: /ocr
+      - listitem [ref=f1e51]:
+        - link "Alerts" [ref=f1e52] [cursor=pointer]:
+          - /url: /alerts
+      - listitem [ref=f1e53]:
+        - link "Reports" [ref=f1e54] [cursor=pointer]:
+          - /url: /reports
+    - main [ref=f1e55]:
+      - heading "Worker Dashboard" [level=2] [ref=f1e56]
+      - generic [ref=f1e57]:
+        - link "View Total Beneficiaries" [ref=f1e58] [cursor=pointer]:
+          - /url: /beneficiaries
+          - heading "Total Beneficiaries" [level=3] [ref=f1e59]
+          - paragraph [ref=f1e60]: "2"
+          - paragraph [ref=f1e61]: Children registered
+        - link "View Today's Attendance" [ref=f1e62] [cursor=pointer]:
+          - /url: /attendance
+          - heading "Today's Attendance" [level=3] [ref=f1e63]
+          - paragraph [ref=f1e64]: "2"
+          - paragraph [ref=f1e65]: 2 records today
+        - link "View Vaccination Due" [ref=f1e66] [cursor=pointer]:
+          - /url: /vaccination
+          - heading "Vaccination Due" [level=3] [ref=f1e67]
+          - paragraph [ref=f1e68]: "3"
+          - paragraph [ref=f1e69]: Pending vaccinations
+        - link "View Health Alerts" [ref=f1e70] [cursor=pointer]:
+          - /url: /health
+          - heading "Health Alerts" [level=3] [ref=f1e71]
+          - paragraph [ref=f1e72]: "0"
+          - paragraph [ref=f1e73]: Latest non-normal records
+      - generic [ref=f1e74]:
+        - generic [ref=f1e75]:
+          - heading "Today's Attendance" [level=3] [ref=f1e76]
+          - list [ref=f1e77]:
+            - listitem [ref=f1e78]:
+              - link "Rahul Kumar (BEN001)" [ref=f1e79] [cursor=pointer]:
+                - /url: /beneficiaries/6ac0d145d903f4ac99e55677
+              - text: — present
+            - listitem [ref=f1e80]:
+              - link "Priya Singh (BEN002)" [ref=f1e81] [cursor=pointer]:
+                - /url: /beneficiaries/6ac0d145d903f4ac99e55678
+              - text: — present
+        - generic [ref=f1e82]:
+          - heading "Pending Vaccinations" [level=3] [ref=f1e83]
+          - list [ref=f1e84]:
+            - listitem [ref=f1e85]:
+              - link "Priya Singh (BEN002)" [ref=f1e86] [cursor=pointer]:
+                - /url: /beneficiaries/6ac0d145d903f4ac99e55678
+              - text: — BCG (due 1/25/2023)
+            - listitem [ref=f1e87]:
+              - link "Rahul Kumar (BEN001)" [ref=f1e88] [cursor=pointer]:
+                - /url: /beneficiaries/6ac0d145d903f4ac99e55677
+              - text: — Polio (due 3/20/2023)
+            - listitem [ref=f1e89]:
+              - link "Rahul Kumar (BEN001)" [ref=f1e90] [cursor=pointer]:
+                - /url: /beneficiaries/6ac0d145d903f4ac99e55677
+              - text: — BCG (due 8/20/2023)
+      - generic [ref=f1e92]:
+        - heading "Health Alerts" [level=3] [ref=f1e93]
+        - list [ref=f1e94]:
+          - listitem [ref=f1e95]: No health alerts in current records.
+      - generic [ref=f1e96]:
+        - heading "Monthly Attendance Trend" [level=3] [ref=f1e98]
+        - heading "Nutrition Status Distribution" [level=3] [ref=f1e102]

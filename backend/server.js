@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { authenticate } = require('./middleware/auth');
 
 // Load environment variables
@@ -18,16 +19,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const uploadsDirectory = path.join(__dirname, 'uploads');
+// OCR originals are retained privately for authenticated review. There is no
+// public static route for this directory.
+const uploadsDirectory = path.join(__dirname, 'private-uploads', 'ocr');
 fs.mkdirSync(uploadsDirectory, { recursive: true });
 
-// Configure multer for short-lived OCR image and PDF uploads.
+// Configure multer for private OCR image and PDF uploads.
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadsDirectory);
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+    cb(null, `${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
   }
 });
 
@@ -89,46 +92,112 @@ const canAccessOcrDocument = (user, document) => {
   return user.role === 'worker' && Boolean(user.centreId) && document.centre_id === user.centreId;
 };
 
+const serializeOcrDocument = (document) => ({
+  id: String(document._id),
+  originalFilename: document.original_filename,
+  sourceMimeType: document.source_mime_type,
+  fileSize: document.file_size,
+  documentType: document.document_type,
+  processingStatus: document.processing_status,
+  reviewStatus: document.review_status,
+  provider: document.provider,
+  confidence: document.confidence,
+  createdAt: document.createdAt,
+  firebaseSynced: document.firebase_synced,
+});
+
+const processStoredOcrDocument = async (document, user) => {
+  const OCRService = require('./services/ocrService');
+  const OcrWorkflowService = require('./services/ocrWorkflowService');
+  const result = await OCRService.processDocument({
+    path: document.storage_path,
+    originalname: document.original_filename,
+    mimetype: document.source_mime_type,
+  });
+  const structured = OcrWorkflowService.buildStructuredData(result.data, result.data.quality);
+  const enriched = await OcrWorkflowService.enrich(structured, user, document.file_hash, document._id);
+  document.provider = result.data.provider;
+  document.confidence = result.data.confidence;
+  document.document_type = enriched.classification.label;
+  document.raw_text = result.data.rawText;
+  document.analysis = { ...result.data, structured: enriched, saveOptions: OcrWorkflowService.getSaveOptions(enriched) };
+  document.processing_status = 'ready_for_review';
+  await document.save();
+  const FirebaseOcrSyncService = require('./services/firebaseOcrSyncService');
+  const firebaseStatus = await FirebaseOcrSyncService.publish(document.toObject());
+  if (firebaseStatus.enabled) {
+    document.firebase_synced = firebaseStatus.synced;
+    document.firebase_synced_at = firebaseStatus.synced ? new Date() : null;
+    await document.save();
+  }
+  return {
+    ...result,
+    data: {
+      ...result.data,
+      documentType: enriched.classification.label,
+      structured: enriched,
+      saveOptions: OcrWorkflowService.getSaveOptions(enriched),
+      ocrDocumentId: String(document._id),
+      storedAt: document.createdAt,
+      originalAvailable: true,
+      firebaseSynced: firebaseStatus.synced,
+    },
+  };
+};
+
 app.post('/api/ocr/process', authenticate, upload.single('document'), async (req, res) => {
+  let document;
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const OCRService = require('./services/ocrService');
-    const result = await OCRService.processDocument(req.file);
+    if (!fileSignatureIsValid(req.file)) {
+      const error = new Error('The uploaded file does not match its declared format. Choose a valid JPG, PNG, WebP, PDF, or TXT file.');
+      error.statusCode = 400;
+      throw error;
+    }
     const OcrDocument = require('./models/OcrDocument');
-    const { rawText, ...analysis } = result.data;
-    const document = await OcrDocument.create({
+    const OcrWorkflowService = require('./services/ocrWorkflowService');
+    document = await OcrDocument.create({
       original_filename: req.file.originalname,
+      stored_filename: req.file.filename,
+      storage_path: req.file.path,
       source_mime_type: req.file.mimetype,
-      provider: result.data.provider,
-      confidence: result.data.confidence,
-      document_type: result.data.documentType,
-      raw_text: rawText,
-      analysis,
+      file_size: req.file.size,
+      file_hash: OcrWorkflowService.hashFile(req.file.path),
+      provider: 'processing',
+      document_type: 'Other/Unknown',
+      processing_status: 'processing',
       centre_id: req.user.centreId || null,
       created_by: req.user._id,
     });
-    const FirebaseOcrSyncService = require('./services/firebaseOcrSyncService');
-    const firebaseStatus = await FirebaseOcrSyncService.publish(document.toObject());
-    if (firebaseStatus.enabled) {
-      document.firebase_synced = firebaseStatus.synced;
-      document.firebase_synced_at = firebaseStatus.synced ? new Date() : null;
-      await document.save();
-    }
-    result.data.ocrDocumentId = String(document._id);
-    result.data.storedAt = document.createdAt;
-    result.data.firebaseSynced = firebaseStatus.synced;
-    res.json(result);
+    res.json(await processStoredOcrDocument(document, req.user));
   } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message || 'OCR processing failed' });
-  } finally {
-    if (req.file?.path) {
-      fs.promises.unlink(req.file.path).catch((error) => {
-        console.warn('Could not remove temporary OCR upload:', error.message);
-      });
+    if (document) {
+      document.processing_status = 'failed';
+      document.analysis = { error: 'OCR processing failed. Upload a clearer document and retry.' };
+      await document.save().catch(() => {});
+    } else if (req.file?.path) {
+      await fs.promises.unlink(req.file.path).catch(() => {});
     }
+    res.status(error.statusCode || 500).json({ message: error.message || 'OCR processing failed' });
+  }
+});
+
+app.post('/api/ocr/:id/retry', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid OCR document ID.' });
+    const OcrDocument = require('./models/OcrDocument');
+    const document = await OcrDocument.findById(req.params.id);
+    if (!document) return res.status(404).json({ message: 'OCR document not found.' });
+    if (!canAccessOcrDocument(req.user, document)) return res.status(403).json({ message: 'You cannot retry this OCR document.' });
+    if (!fs.existsSync(document.storage_path)) return res.status(404).json({ message: 'The original document is no longer available. Upload it again.' });
+    document.processing_status = 'processing';
+    await document.save();
+    res.json(await processStoredOcrDocument(document, req.user));
+  } catch (error) {
+    res.status(error.statusCode || 422).json({ message: error.message || 'OCR processing failed. Upload a clearer document and try again.' });
   }
 });
 
@@ -144,6 +213,17 @@ app.post('/api/chatbot/message', authenticate, async (req, res) => {
   }
 });
 
+const fileSignatureIsValid = (file) => {
+  const header = fs.readFileSync(file.path).subarray(0, 16);
+  const textStart = header.toString('utf8');
+  if (file.mimetype === 'image/jpeg') return header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+  if (file.mimetype === 'image/png') return header.length >= 8 && header.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (file.mimetype === 'image/webp') return header.subarray(0, 4).toString() === 'RIFF' && header.subarray(8, 12).toString() === 'WEBP';
+  if (file.mimetype === 'application/pdf') return textStart.startsWith('%PDF-');
+  if (file.mimetype === 'text/plain') return !header.includes(0);
+  return false;
+};
+
 app.get('/api/ocr/latest', authenticate, async (req, res) => {
   try {
     const OcrDocument = require('./models/OcrDocument');
@@ -154,14 +234,62 @@ app.get('/api/ocr/latest', authenticate, async (req, res) => {
       : req.user.role === 'worker' && req.user.centreId
         ? { $or: [{ centre_id: req.user.centreId }, { created_by: req.user._id }] }
         : { created_by: req.user._id };
+    if (req.query.status && ['pending', 'reviewed', 'saved'].includes(req.query.status)) filter.review_status = req.query.status;
+    if (req.query.type) filter.document_type = req.query.type;
+    if (req.query.q) {
+      const query = String(req.query.q).slice(0, 80).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$and = [{ $or: [
+        { original_filename: new RegExp(query, 'i') },
+        { document_type: new RegExp(query, 'i') },
+        { 'analysis.structured.fields.beneficiaryId.value': new RegExp(query, 'i') },
+      ] }];
+    }
     const documents = await OcrDocument.find(filter)
-      .select('original_filename provider confidence document_type review_status firebase_synced createdAt')
+      .select('original_filename source_mime_type file_size provider confidence document_type processing_status review_status firebase_synced createdAt analysis.structured.fields.beneficiaryId.value')
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
-    res.json({ documents });
+    res.json({ documents: documents.map((document) => ({
+      ...serializeOcrDocument(document),
+      beneficiaryId: document.analysis?.structured?.fields?.beneficiaryId?.value || null,
+    })) });
   } catch (error) {
     res.status(500).json({ message: 'Could not load recent OCR documents.' });
+  }
+});
+
+app.get('/api/ocr/:id/original', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid OCR document ID.' });
+    const OcrDocument = require('./models/OcrDocument');
+    const document = await OcrDocument.findById(req.params.id).lean();
+    if (!document) return res.status(404).json({ message: 'OCR document not found.' });
+    if (!canAccessOcrDocument(req.user, document)) return res.status(403).json({ message: 'You cannot access this OCR document.' });
+    if (!document.storage_path || !fs.existsSync(document.storage_path)) return res.status(404).json({ message: 'Original document is not available.' });
+    res.setHeader('Content-Type', document.source_mime_type);
+    res.setHeader('Content-Disposition', `inline; filename="${String(document.original_filename).replace(/["\\]/g, '')}"`);
+    fs.createReadStream(document.storage_path).pipe(res);
+  } catch {
+    res.status(500).json({ message: 'Could not open the original document.' });
+  }
+});
+
+app.post('/api/ocr/:id/confirm', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid OCR document ID.' });
+    const OcrDocument = require('./models/OcrDocument');
+    const document = await OcrDocument.findById(req.params.id);
+    if (!document) return res.status(404).json({ message: 'OCR document not found.' });
+    if (!canAccessOcrDocument(req.user, document)) return res.status(403).json({ message: 'You cannot save this OCR document.' });
+    if (document.processing_status !== 'ready_for_review') return res.status(409).json({ message: 'This document is not ready for review.' });
+    if (document.analysis?.structured?.duplicates?.length && !req.body.options?.allowDuplicate) {
+      return res.status(409).json({ message: 'A possible duplicate was found. Review it and explicitly confirm before saving.' });
+    }
+    const OcrWorkflowService = require('./services/ocrWorkflowService');
+    const result = await OcrWorkflowService.saveReview(document, req.body.review, req.user, req.body.options || {});
+    res.json({ message: 'Verified information was saved successfully.', ...result, document: serializeOcrDocument(document) });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message || 'Could not save the reviewed OCR data.' });
   }
 });
 
@@ -174,7 +302,7 @@ app.get('/api/ocr/:id', authenticate, async (req, res) => {
     if (!canAccessOcrDocument(req.user, document)) return res.status(403).json({ message: 'You cannot access this OCR document.' });
     res.json({
       document: {
-        id: String(document._id),
+        ...serializeOcrDocument(document),
         ...document.analysis,
         rawText: document.raw_text,
         confidence: document.confidence,

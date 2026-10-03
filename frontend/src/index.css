@@ -1030,3 +1030,55 @@ body {
 .verification-actions {
   margin-top: 1.5rem;
 }
+
+/* Smart OCR review workflow */
+.ocr-workspace { max-width: 1220px; }
+.ocr-upload-card, .ocr-history { border: 1px solid #dce6e3; border-radius: 8px; padding: 1.25rem; background: #fbfefd; }
+.ocr-file-details, .ocr-upload-actions, .ocr-status, .ocr-history-heading, .ocr-meta, .ocr-summary, .ocr-vaccine-row { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+.ocr-file-details { margin-top: .85rem; padding: .75rem; border-radius: 5px; background: #eef7f4; }
+.ocr-file-details span { color: #526861; }
+.ocr-upload-actions { margin-top: 1rem; }
+.ocr-status { margin-top: 1rem; color: #314a45; }
+.ocr-status progress { width: 190px; height: 10px; }
+.ocr-review-layout { display: grid; grid-template-columns: minmax(280px, .85fr) minmax(0, 1.4fr); gap: 1.25rem; margin-top: 1.25rem; }
+.ocr-original-panel, .ocr-review-panel { min-width: 0; background: #fff; border: 1px solid #dde7e5; border-radius: 8px; padding: 1rem; }
+.ocr-preview-media { display: block; width: 100%; min-height: 360px; max-height: 680px; object-fit: contain; background: #f2f6f5; border: 1px solid #dae4e1; border-radius: 5px; margin-bottom: .85rem; }
+.ocr-preview-placeholder { min-height: 260px; padding: 2rem; display: grid; place-items: center; text-align: center; background: #f7faf9; border: 1px dashed #b8cbc5; border-radius: 5px; color: #61746e; }
+.ocr-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 1rem; }
+.ocr-meta div { background: #f4f8f7; border-radius: 5px; padding: .7rem; }
+.ocr-meta strong, .ocr-meta span { display: block; }
+.ocr-meta strong { font-size: .78rem; color: #526861; text-transform: uppercase; }
+.ocr-meta span { margin-top: .2rem; color: #1e3831; }
+.ocr-summary { margin: .75rem 0; }
+.ocr-summary span { background: #e7f3ef; color: #1b5d4e; padding: .4rem .65rem; border-radius: 999px; font-weight: 600; font-size: .9rem; }
+.ocr-fieldset { border: 1px solid #dbe5e2; border-radius: 6px; margin: 1rem 0; padding: .9rem; }
+.ocr-fieldset legend { font-weight: 700; color: #274840; padding: 0 .35rem; }
+.ocr-field { display: grid; grid-template-columns: minmax(160px, .7fr) minmax(0, 1fr); gap: .8rem; align-items: center; border-left: 4px solid #f0a83d; padding: .55rem .65rem; margin: .4rem 0; background: #fffaf0; }
+.ocr-field.extracted { border-left-color: #2a9b70; background: #f1fbf6; }
+.ocr-field.missing { border-left-color: #df5b55; background: #fff4f3; }
+.ocr-field span { font-weight: 600; color: #334b45; }
+.ocr-field small { display: block; margin-top: .18rem; font-weight: 400; color: #687b76; }
+.ocr-field input, .ocr-field select, .ocr-field textarea, .ocr-vaccine-row input { width: 100%; border: 1px solid #cbd9d5; border-radius: 4px; padding: .55rem; font: inherit; }
+.ocr-field textarea { min-height: 76px; resize: vertical; }
+.ocr-vaccine-row { align-items: end; margin-bottom: .65rem; }
+.ocr-vaccine-row label { flex: 1; min-width: 135px; font-size: .88rem; color: #405650; }
+.ocr-checkbox { display: block; margin: .7rem 0; color: #3d514c; }
+.ocr-checkbox input { width: auto; margin-right: .45rem; }
+.ocr-table-details, .ocr-raw-text { margin-top: 1rem; }
+.ocr-raw-text { max-height: 300px; overflow: auto; white-space: pre-wrap; background: #f6f8f7; padding: .75rem; border-radius: 4px; }
+.ocr-history { margin-top: 1.25rem; }
+.ocr-history-heading { justify-content: space-between; margin-bottom: .85rem; }
+.ocr-history-heading h3 { margin: 0; }
+.ocr-history-heading p { margin: .25rem 0 0; color: #64746f; }
+.ocr-history-heading input, .ocr-history-heading select { padding: .55rem; border: 1px solid #cbd9d5; border-radius: 4px; font: inherit; }
+.ocr-history-table { overflow-x: auto; }
+.ocr-history-table table { width: 100%; min-width: 720px; border-collapse: collapse; }
+.ocr-history-table th, .ocr-history-table td { text-align: left; padding: .7rem; border-bottom: 1px solid #e5edeb; }
+.ocr-history-table th { color: #48605a; background: #f3f8f6; }
+
+@media (max-width: 840px) {
+  .ocr-review-layout { grid-template-columns: 1fr; }
+  .ocr-meta { grid-template-columns: 1fr; }
+  .ocr-field { grid-template-columns: 1fr; }
+  .ocr-preview-media { min-height: 260px; }
+}

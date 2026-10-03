@@ -109,26 +109,40 @@ export const reportAssistantAPI = {
 
 // OCR API
 export const ocrAPI = {
-  processDocument: async (file) => {
+  processDocument: (file, onProgress = () => {}) => new Promise((resolve, reject) => {
     const formData = new FormData();
     formData.append('document', file);
     const token = localStorage.getItem('token');
-    let response;
-    try {
-      response = await fetch('/api/ocr/process', {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      });
-    } catch {
-      throw new Error('Cannot reach the backend server. Start it and try again.');
-    }
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || 'OCR processing failed');
-    return data;
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE_URL}/ocr/process`);
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+    };
+    xhr.onerror = () => reject(new Error('Cannot reach the backend server. Start it and try again.'));
+    xhr.onload = () => {
+      const data = (() => { try { return JSON.parse(xhr.responseText || '{}'); } catch { return {}; } })();
+      if (xhr.status < 200 || xhr.status >= 300) return reject(new Error(data.message || 'OCR processing failed'));
+      resolve(data);
+    };
+    xhr.send(formData);
+  }),
+  getLatest: (limit = 10, filters = {}) => {
+    const query = new URLSearchParams({ limit: String(limit), ...Object.entries(filters).reduce((result, [key, value]) => (value ? { ...result, [key]: value } : result), {}) });
+    return request(`/ocr/latest?${query.toString()}`);
   },
-  getLatest: (limit = 10) => request(`/ocr/latest?limit=${limit}`),
   getById: (id) => request(`/ocr/${id}`),
+  retry: (id) => request(`/ocr/${id}/retry`, { method: 'POST' }),
+  confirm: (id, review, options) => request(`/ocr/${id}/confirm`, { method: 'POST', body: JSON.stringify({ review, options }) }),
+  openOriginal: async (id) => {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_BASE_URL}/ocr/${id}/original`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || 'Could not open the original document.');
+    }
+    return URL.createObjectURL(await response.blob());
+  },
 };
 
 // Chatbot API
