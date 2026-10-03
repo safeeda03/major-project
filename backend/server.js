@@ -282,7 +282,12 @@ app.post('/api/ocr/:id/confirm', authenticate, async (req, res) => {
     if (!document) return res.status(404).json({ message: 'OCR document not found.' });
     if (!canAccessOcrDocument(req.user, document)) return res.status(403).json({ message: 'You cannot save this OCR document.' });
     if (document.processing_status !== 'ready_for_review') return res.status(409).json({ message: 'This document is not ready for review.' });
-    if (document.analysis?.structured?.duplicates?.length && !req.body.options?.allowDuplicate) {
+    // A retry/re-upload can legitimately find an earlier *pending* OCR scan of
+    // the same file. Only require explicit confirmation when a matching record
+    // has already been saved, or a matching module record already exists.
+    const hasSavedDuplicate = (document.analysis?.structured?.duplicates || [])
+      .some((duplicate) => ['saved', 'existing'].includes(duplicate.status));
+    if (hasSavedDuplicate && !req.body.options?.allowDuplicate) {
       return res.status(409).json({ message: 'A possible duplicate was found. Review it and explicitly confirm before saving.' });
     }
     const OcrWorkflowService = require('./services/ocrWorkflowService');

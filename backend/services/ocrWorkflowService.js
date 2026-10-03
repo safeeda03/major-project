@@ -47,9 +47,18 @@ function parseDate(value) {
   if (match) [, year, month, day] = match;
   else {
     match = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
-    if (!match) return null;
-    [, day, month, year] = match;
-    year = Number(year) < 100 ? String(2000 + Number(year)) : year;
+    if (match) {
+      [, day, month, year] = match;
+      year = Number(year) < 100 ? String(2000 + Number(year)) : year;
+    } else {
+      const namedMonth = raw.match(/^(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})$/i);
+      if (!namedMonth) return null;
+      [, day, month, year] = namedMonth;
+      month = [
+        'january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december',
+      ].indexOf(month.toLowerCase()) + 1;
+    }
   }
   const result = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
   return result.getUTCFullYear() === Number(year) && result.getUTCMonth() === Number(month) - 1 && result.getUTCDate() === Number(day) ? result : null;
@@ -106,23 +115,23 @@ class OcrWorkflowService {
       beneficiaryId: field(ocrData.beneficiaryId || labelValue(rawText, ['beneficiary id', 'beneficiary no'])),
       childName: field(ocrData.childName || labelValue(rawText, ['child name', 'name of child'])),
       dateOfBirth: field(ocrData.dateOfBirth || firstDate(labelValue(rawText, ['date of birth', 'birth date', 'dob']))),
-      age: field(ocrData.age || labelValue(rawText, ['age'])),
-      gender: field(labelValue(rawText, ['gender', 'sex']) || rawText.match(/\b(?:male|female)\b/i)?.[0]),
+      age: field(ocrData.age || rawText.match(/\b(?:age|aged)\s*[:|\-]?\s*(\d+\s*(?:years?|yrs?)(?:\s+\d+\s*(?:months?|mos?))?)/i)?.[1] || labelValue(rawText, ['age'])),
+      gender: field(ocrData.gender || rawText.match(/\b(?:gender|sex)\s*[:|\-]?\s*(male|female)\b/i)?.[1] || labelValue(rawText, ['gender', 'sex']) || rawText.match(/\b(?:male|female)\b/i)?.[0]),
       parentName: field(ocrData.parentName || labelValue(rawText, ['parent name', 'guardian name', 'parent', 'guardian', 'mother', 'father'])),
-      parentId: field(labelValue(rawText, ['parent id', 'guardian id'])),
-      phone: field(labelValue(rawText, ['phone number', 'contact number', 'mobile number', 'phone']) || rawText.match(/\b(?:\+91[- ]?)?[6-9]\d{9}\b/)?.[0]),
-      address: field(labelValue(rawText, ['address'])),
+      parentId: field(ocrData.parentId || labelValue(rawText, ['parent id', 'guardian id'])),
+      phone: field(ocrData.phone || labelValue(rawText, ['phone number', 'contact number', 'mobile number', 'phone']) || rawText.match(/\b(?:\+91[- ]?)?[6-9]\d{9}\b/)?.[0]),
+      address: field(ocrData.address || labelValue(rawText, ['address'])),
       anganwadiId: field(ocrData.anganwadiId || labelValue(rawText, ['anganwadi centre id', 'anganwadi id', 'centre id', 'center id'])),
       height: field(ocrData.height || rawText.match(/\b(?:height|length)\s*[:\-]?\s*(\d+(?:\.\d+)?\s*cm)\b/i)?.[1]),
       weight: field(ocrData.weight || rawText.match(/\bweight\s*[:\-]?\s*(\d+(?:\.\d+)?\s*kg)\b/i)?.[1]),
-      muac: field(rawText.match(/\bmuac\s*[:\-]?\s*(\d+(?:\.\d+)?\s*cm)\b/i)?.[1]),
-      nutritionalStatus: field(rawText.match(/\b(?:nutrition(?:al)?\s*status|status)\s*[:\-]?\s*(normal|underweight|overweight|stunted|wasted)\b/i)?.[1] || rawText.match(/\b(underweight|overweight|stunted|wasted)\b/i)?.[1]),
+      muac: field(ocrData.muac || rawText.match(/\bmuac\s*[:\-]?\s*(\d+(?:\.\d+)?\s*cm)\b/i)?.[1]),
+      nutritionalStatus: field(ocrData.nutritionalStatus || rawText.match(/\b(?:nutritional?\s*status|nutrition\s*status|status)\s*[:|\-]?\s*(normal|underweight|overweight|stunted|wasted)\b/i)?.[1] || rawText.match(/\b(underweight|overweight|stunted|wasted)\b/i)?.[1]),
       screeningDate: field(ocrData.recordDate || firstDate(labelValue(rawText, ['screening date', 'record date', 'report date', 'date']))),
       healthObservations: field(ocrData.healthInformation || labelValue(rawText, ['health observations', 'observations', 'health information'])),
       attendanceStatus: field(labelValue(rawText, ['attendance status', 'attendance']) || rawText.match(/\b(?:present|absent|half[ -]?day)\b/i)?.[0]),
     };
     const vaccinations = (ocrData.vaccinationRecords || []).map((record) => ({
-      vaccine: field(record.vaccine), date: field(record.date), nextDueDate: field(record.nextDue), status: field('completed', { status: 'review_recommended' }),
+      vaccine: field(record.vaccine), dose: field(record.dose), date: field(record.date), nextDueDate: field(record.nextDue), status: field(record.status),
     })).filter((record) => record.vaccine.value);
     const classification = classify(rawText);
     const warnings = [];
@@ -217,6 +226,9 @@ class OcrWorkflowService {
     if (beneficiary && !isScopedBeneficiary(user, beneficiary)) { const error = new Error('This beneficiary belongs to another centre.'); error.statusCode = 403; throw error; }
     if (!beneficiary && options.createBeneficiary) {
       beneficiary = await Beneficiary.create({
+        // Preserve a valid ID supplied by the reviewed document.  Leaving this
+        // undefined deliberately lets the existing model generate its normal ID.
+        beneficiary_id: /^BEN\d{3,}$/i.test(beneficiaryId) ? beneficiaryId.toUpperCase() : undefined,
         name: clean(fields.childName?.value), dob: parseDate(fields.dateOfBirth?.value), gender: clean(fields.gender?.value).toLowerCase(),
         parent_id: clean(fields.parentId?.value) || 'PENDING', anganwadi_id: user.centreId, beneficiary_type: 'child', contact_phone: clean(fields.phone?.value) || undefined,
         notes: clean(fields.parentName?.value) ? `Parent/Guardian from OCR document: ${clean(fields.parentName?.value)}` : undefined,
@@ -247,7 +259,7 @@ class OcrWorkflowService {
         const vaccineName = clean(vaccine.vaccine?.value); const vaccinationDate = parseDate(vaccine.date?.value);
         if (!vaccineName || !vaccinationDate) continue;
         const nextDate = parseDate(vaccine.nextDueDate?.value);
-        const record = await Vaccination.create({ beneficiary_id: beneficiaryId, vaccine: vaccineName, date: vaccinationDate, next_due_date: nextDate || undefined, completed: clean(vaccine.status?.value).toLowerCase() !== 'due' });
+        const record = await Vaccination.create({ beneficiary_id: beneficiaryId, vaccine: vaccineName, date: vaccinationDate, next_due_date: nextDate || undefined, completed: clean(vaccine.status?.value).toLowerCase() === 'completed' });
         saved.push({ module: 'vaccination', id: String(record._id) });
       }
       if (!saved.some((record) => record.module === 'vaccination')) { const error = new Error('Vaccination saving requires a vaccine name and valid vaccination date.'); error.statusCode = 400; throw error; }

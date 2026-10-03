@@ -125,7 +125,7 @@ GOOGLE_APPLICATION_CREDENTIALS=C:/secure/poshanai-vision-service-account.json
 
 4. Restart the backend. The OCR screen will show `Google Cloud Vision` when it is being used. If the cloud service is temporarily unavailable, `auto` safely falls back to local OCR. Set `OCR_PROVIDER=google-cloud-vision` if you want the upload to fail instead of falling back.
 
-Google Cloud Vision is used for image uploads. The current PDF path extracts selectable PDF text; scanned PDF support needs Google's asynchronous Cloud Storage batch workflow.
+Google Cloud Vision is used for image uploads. PDFs with selectable text are read directly. For scanned multi-page PDFs, PoshanAI locally renders each page at 220 DPI and runs Tesseract on every page when Poppler's `pdftoppm` command is available. This computer already has it; deploy it alongside the backend for the same scanned-PDF support in production.
 
 ### Keep the latest scan in Firebase in real time
 

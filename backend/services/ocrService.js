@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const Tesseract = require('tesseract.js');
 const pdfParse = require('pdf-parse');
+const execFileAsync = promisify(execFile);
 
 // Google Cloud Vision is optional. Keeping it optional lets the application
 // continue to work locally with Tesseract until a Cloud project is configured.
@@ -23,6 +26,7 @@ try {
 
 const DATE_PATTERN = /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{4}|(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+\d{4})/i;
 const VACCINE_PATTERN = /\b(bcg|opv|polio|dpt|pentavalent|mmr|measles|hepatitis\s*b)\b/i;
+const VACCINE_ROW_PATTERN = /^(bcg|opv|polio|dpt|pentavalent|mmr|measles(?:[-\s]rubella)?|hepatitis\s*b)/i;
 const SAMPLE_FOOTER_PATTERN = /sample\s+document\s+prepared\s+for\s+testing\s+the\s+poshanai\s+ocr\s+scanning\s+feature\.?/gi;
 const OCR_CACHE_DIRECTORY = path.join(__dirname, '..', '.cache', 'tesseract');
 const VISION_ENABLED = String(process.env.GOOGLE_CLOUD_VISION_ENABLED || '').toLowerCase() === 'true';
@@ -69,6 +73,32 @@ function hasFuzzyLabel(line, label) {
     })) return true;
   }
   return false;
+}
+
+function normalizeGender(value) {
+  const candidate = String(value || '').toLowerCase().replace(/[^a-z]/g, '');
+  if (candidate === 'male' || editDistance(candidate, 'male') <= 1) return 'Male';
+  if (candidate === 'female' || editDistance(candidate, 'female') <= 1) return 'Female';
+  return '';
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// PDF text extractors frequently collapse a table row, e.g.
+// "Height94.5 cm03 October 2026". This intentionally searches only explicit
+// known labels so it never infers a value from an unrelated sentence.
+function getLabeledLineValue(lines, labels) {
+  const orderedLabels = [...labels].sort((left, right) => right.length - left.length);
+  for (const line of lines) {
+    for (const label of orderedLabels) {
+      const pattern = escapeRegExp(label).replace(/\s+/g, '\\s*');
+      const match = String(line).match(new RegExp(`${pattern}\\s*[:|\\-]?\\s*(.+)$`, 'i'));
+      if (match?.[1]) return match[1].trim();
+    }
+  }
+  return '';
 }
 
 function mergeOCRText(texts) {
@@ -146,6 +176,16 @@ class OCRService {
         rawText = pdf.text.replace(/\r/g, '').trim();
         provider = 'pdf-text';
         quality = { pageCount: pdf.numpages || 1, warnings: [] };
+        // A scanned PDF has no selectable text. Render every page locally and
+        // run the existing Tesseract engine on each page, preserving the PDF.
+        if (!rawText) {
+          const scannedPdf = await this.recognizeScannedPdf(file.path);
+          rawText = scannedPdf.text;
+          confidence = scannedPdf.confidence;
+          alternativeTexts = scannedPdf.alternativeTexts;
+          provider = 'tesseract-scanned-pdf';
+          quality = { ...quality, ...scannedPdf.quality };
+        }
       } else {
         quality = await this.inspectImageQuality(file.path);
         const cloudResult = await this.recognizeWithGoogleVision(file.path);
@@ -285,7 +325,7 @@ class OCRService {
       };
     } catch (cause) {
       console.error('OCR processing failed:', cause.message);
-      if (cause.statusCode === 503) throw cause;
+      if (cause.statusCode === 503 || cause.statusCode === 422) throw cause;
       const error = new Error('Could not read this image. Use a clear JPG, PNG, or WebP image and try again.');
       error.statusCode = 422;
       throw error;
@@ -309,6 +349,50 @@ class OCRService {
       quality.warnings.push('Image quality could not be measured. Verify all extracted fields carefully.');
     }
     return quality;
+  }
+
+  static async recognizeScannedPdf(filePath) {
+    const renderDirectory = fs.mkdtempSync(path.join(OCR_CACHE_DIRECTORY, 'pdf-pages-'));
+    const outputPrefix = path.join(renderDirectory, 'page');
+    try {
+      try {
+        // pdftoppm is supplied by Poppler and is available in this Windows
+        // environment. Its output remains temporary and is never exposed.
+        await execFileAsync('pdftoppm', ['-png', '-r', '220', filePath, outputPrefix], { timeout: 60000, maxBuffer: 1024 * 1024 });
+      } catch (cause) {
+        const error = new Error('This scanned PDF could not be read. Upload clear image pages instead, or install Poppler (pdftoppm) for scanned PDF OCR.');
+        error.statusCode = 422;
+        throw error;
+      }
+      const pages = fs.readdirSync(renderDirectory)
+        .filter((name) => /^page-\d+\.png$/i.test(name))
+        .sort((left, right) => Number(left.match(/\d+/)[0]) - Number(right.match(/\d+/)[0]));
+      if (!pages.length) {
+        const error = new Error('No readable pages were found in this PDF. Upload a clearer PDF or image.');
+        error.statusCode = 422;
+        throw error;
+      }
+      const attempts = await Promise.all(pages.map((page) => Tesseract.recognize(path.join(renderDirectory, page), 'eng', {
+        cachePath: OCR_CACHE_DIRECTORY,
+        tessedit_pageseg_mode: '6',
+      })));
+      const texts = attempts.map((attempt) => attempt.data.text.replace(/\r/g, '').trim());
+      const confidences = attempts.map((attempt) => attempt.data.confidence).filter(Number.isFinite);
+      return {
+        text: texts.filter(Boolean).join('\n\n'),
+        alternativeTexts: texts,
+        confidence: confidences.length ? Number((confidences.reduce((sum, value) => sum + value, 0) / confidences.length).toFixed(1)) : null,
+        quality: {
+          pageCount: pages.length,
+          preprocessing: ['PDF page rendering at 220 DPI', 'per-page OCR'],
+          warnings: [],
+        },
+      };
+    } finally {
+      // This directory is created above with mkdtemp and contains only the
+      // temporary rendered pages for this request.
+      await fs.promises.rm(renderDirectory, { recursive: true, force: true }).catch(() => {});
+    }
   }
 
   static async recognizeWithGoogleVision(filePath) {
@@ -381,7 +465,9 @@ class OCRService {
     if (extractedData.recordDate) addEvidence(items, 'Record date', extractedData.recordDate);
     if (extractedData.dateOfBirth) addEvidence(items, 'Date of birth', extractedData.dateOfBirth);
     if (extractedData.beneficiaryId) addEvidence(items, 'Beneficiary ID', extractedData.beneficiaryId);
+    if (extractedData.gender) addEvidence(items, 'Gender', extractedData.gender);
     if (extractedData.anganwadiId) addEvidence(items, 'Anganwadi ID', extractedData.anganwadiId);
+    if (extractedData.nutritionalStatus) addEvidence(items, 'Nutritional status', extractedData.nutritionalStatus);
     if (extractedData.nutritionDetails) addEvidence(items, 'Nutrition findings', extractedData.nutritionDetails);
     if (extractedData.healthInformation) addEvidence(items, 'Health observations', extractedData.healthInformation);
 
@@ -441,8 +527,14 @@ class OCRService {
       recordDate: '',
       dateOfBirth: '',
       parentName: '',
+      parentId: '',
+      phone: '',
+      address: '',
       beneficiaryId: '',
+      gender: '',
       anganwadiId: '',
+      muac: '',
+      nutritionalStatus: '',
       nutritionDetails: '',
       healthInformation: '',
       vaccinationRecords: [],
@@ -486,13 +578,19 @@ class OCRService {
         if (match) extractedData.dateOfBirth = match[1];
       }
 
-      const vaccine = normalizedLine.match(VACCINE_PATTERN);
+      const vaccine = normalizedLine.match(VACCINE_ROW_PATTERN) || normalizedLine.match(VACCINE_PATTERN);
       if (vaccine) {
         const date = normalizedLine.match(DATE_PATTERN);
+        const beforeDate = date?.index === undefined ? normalizedLine : normalizedLine.slice(0, date.index);
+        const dose = beforeDate.slice(vaccine[0].length).match(/\d+/)?.[0] || '';
+        const afterDate = date?.index === undefined ? normalizedLine : normalizedLine.slice(date.index + date[0].length);
+        const status = afterDate.match(/(completed|pending|due|not\s+given)\b/i)?.[1] || '';
         extractedData.vaccinationRecords.push({
           vaccine: vaccine[1].toUpperCase().replace(/\s+/g, ' '),
           date: date ? date[1] : '',
           nextDue: '',
+          dose,
+          status,
         });
       }
     }
@@ -610,17 +708,81 @@ class OCRService {
 
     const allTexts = [text, ...alternativeTexts];
     const allLines = [...new Set(allTexts.flatMap((candidateText) => candidateText.split('\n')).map((line) => line.trim()).filter(Boolean))];
+    const combinedText = allLines.join('\n');
+
+    // Explicit field labels make the flattened PDF table reversible without
+    // relying on made-up positions or values.
+    const preciseChildName = getLabeledLineValue(allLines, ['Child Name', 'Name of Child']);
+    const preciseParentName = getLabeledLineValue(allLines, ['Mother / Guardian Name', 'Parent / Guardian Name', 'Guardian Name', 'Mother Name', 'Father Name']);
+    if (preciseChildName) extractedData.childName = preciseChildName;
+    if (preciseParentName) extractedData.parentName = preciseParentName;
+    if (!extractedData.parentId) extractedData.parentId = getLabeledLineValue(allLines, ['Parent / Guardian ID', 'Guardian ID', 'Parent ID']);
+    if (!extractedData.phone) extractedData.phone = getLabeledLineValue(allLines, ['Contact Number', 'Phone Number', 'Mobile Number', 'Phone']);
+    if (!extractedData.address) extractedData.address = getLabeledLineValue(allLines, ['Address']);
+    if (!extractedData.beneficiaryId) extractedData.beneficiaryId = getLabeledLineValue(allLines, ['Beneficiary ID', 'Beneficiary No']).match(/BEN\d{3,}/i)?.[0] || '';
+    if (!extractedData.anganwadiId) extractedData.anganwadiId = getLabeledLineValue(allLines, ['Anganwadi Centre ID', 'Anganwadi Center ID', 'Anganwadi ID', 'Centre ID', 'Center ID']);
+    if (!extractedData.dateOfBirth) {
+      extractedData.dateOfBirth = getLabeledLineValue(allLines, ['Date of Birth', 'Birth Date', 'DOB']).match(DATE_PATTERN)?.[0] || '';
+    }
+
+    // Tables often arrive from OCR as simple adjacent text, e.g.
+    // "Age 3 years 8 months" instead of "Age: 3 years 8 months". These
+    // patterns only accept concrete values, so absent fields stay empty.
+    if (!extractedData.age) {
+      extractedData.age = combinedText.match(/\b(?:age|aged)\s*[:|\-]?\s*(\d+\s*(?:years?|yrs?)(?:\s+\d+\s*(?:months?|mos?))?)/i)?.[1] || '';
+    }
+    if (!extractedData.gender) {
+      extractedData.gender = combinedText.match(/\b(?:gender|sex)\s*[:|\-]?\s*(male|female)\b/i)?.[1] || '';
+    }
+    if (!extractedData.nutritionalStatus) {
+      extractedData.nutritionalStatus = combinedText.match(/\b(?:nutritional?\s+status|nutrition\s+status|status)\s*[:|\-]?\s*(normal|underweight|overweight|stunted|wasted)\b/i)?.[1] || '';
+    }
+
+    const heightValue = getLabeledLineValue(allLines, ['Height', 'Length']);
+    const weightValue = getLabeledLineValue(allLines, ['Weight']);
+    const muacValue = getLabeledLineValue(allLines, ['MUAC']);
+    if (!extractedData.height) extractedData.height = heightValue.match(/\d+(?:\.\d+)?\s*cm/i)?.[0] || '';
+    if (!extractedData.weight) extractedData.weight = weightValue.match(/\d+(?:\.\d+)?\s*kg/i)?.[0] || '';
+    if (!extractedData.muac) extractedData.muac = muacValue.match(/\d+(?:\.\d+)?\s*cm/i)?.[0] || '';
+    if (!extractedData.nutritionalStatus) {
+      extractedData.nutritionalStatus = getLabeledLineValue(allLines, ['Nutritional Status', 'Nutrition Status']).match(/(normal|underweight|overweight|stunted|wasted)(?=\d|\s|$)/i)?.[1] || '';
+    }
+    if (!extractedData.healthInformation) {
+      const healthValue = getLabeledLineValue(allLines, ['Health Observation', 'Health Observations']);
+      extractedData.healthInformation = healthValue.replace(new RegExp(DATE_PATTERN.source, 'i'), '').trim();
+    }
+    if (!extractedData.recordDate) {
+      const healthRows = [heightValue, weightValue, muacValue, getLabeledLineValue(allLines, ['Nutritional Status']), getLabeledLineValue(allLines, ['Health Observation'])];
+      extractedData.recordDate = healthRows.map((row) => row.match(DATE_PATTERN)?.[0]).find(Boolean) || '';
+    }
+
+    // Table columns are sometimes emitted as separate OCR lines: "Gender"
+    // followed by "Male". Inspect only the line containing the gender/sex
+    // label and the next two values, including common I/l OCR confusion.
+    if (!extractedData.gender) {
+      for (const [index, line] of allLines.entries()) {
+        if (!hasFuzzyLabel(line, 'gender') && !hasFuzzyLabel(line, 'sex')) continue;
+        const nearby = [line, allLines[index + 1], allLines[index + 2]];
+        const gender = nearby.map(normalizeGender).find(Boolean);
+        if (gender) {
+          extractedData.gender = gender;
+          break;
+        }
+      }
+    }
 
     for (const [lineIndex, line] of allLines.entries()) {
       if (!extractedData.beneficiaryId) {
         const idMatch = line.match(/(?:B[Ee]?[Nn]|[@8]N)[0OoeE6GgYy]{3,4}/);
         if (idMatch) {
-          extractedData.beneficiaryId = idMatch[0]
-            .toUpperCase()
-            .replace(/^[@8]/, 'B')
+          // Normalize only the numeric suffix. Applying OCR corrections to
+          // the whole match previously turned a valid BEN prefix into B6N.
+          const captured = idMatch[0].toUpperCase();
+          const suffix = (captured.match(/[0OEGY6]{3,4}$/) || [''])[0]
             .replace(/O/g, '0')
             .replace(/[EG]/g, '6')
             .replace(/Y/g, '4');
+          extractedData.beneficiaryId = `BEN${suffix}`;
         }
       }
 
@@ -677,6 +839,10 @@ class OCRService {
           }
         }
       }
+    }
+
+    if (!extractedData.nutritionalStatus && /^(?:normal|underweight|overweight|stunted|wasted)$/i.test(extractedData.healthInformation || '')) {
+      extractedData.nutritionalStatus = extractedData.healthInformation;
     }
 
     // The table's value column is often recognized separately from its labels.
