@@ -83,7 +83,13 @@ app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 
 // OCR Routes
-app.post('/api/ocr/process', upload.single('document'), async (req, res) => {
+const canAccessOcrDocument = (user, document) => {
+  if (user.role === 'supervisor') return true;
+  if (String(document.created_by) === String(user._id)) return true;
+  return user.role === 'worker' && Boolean(user.centreId) && document.centre_id === user.centreId;
+};
+
+app.post('/api/ocr/process', authenticate, upload.single('document'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
@@ -91,6 +97,29 @@ app.post('/api/ocr/process', upload.single('document'), async (req, res) => {
 
     const OCRService = require('./services/ocrService');
     const result = await OCRService.processDocument(req.file);
+    const OcrDocument = require('./models/OcrDocument');
+    const { rawText, ...analysis } = result.data;
+    const document = await OcrDocument.create({
+      original_filename: req.file.originalname,
+      source_mime_type: req.file.mimetype,
+      provider: result.data.provider,
+      confidence: result.data.confidence,
+      document_type: result.data.documentType,
+      raw_text: rawText,
+      analysis,
+      centre_id: req.user.centreId || null,
+      created_by: req.user._id,
+    });
+    const FirebaseOcrSyncService = require('./services/firebaseOcrSyncService');
+    const firebaseStatus = await FirebaseOcrSyncService.publish(document.toObject());
+    if (firebaseStatus.enabled) {
+      document.firebase_synced = firebaseStatus.synced;
+      document.firebase_synced_at = firebaseStatus.synced ? new Date() : null;
+      await document.save();
+    }
+    result.data.ocrDocumentId = String(document._id);
+    result.data.storedAt = document.createdAt;
+    result.data.firebaseSynced = firebaseStatus.synced;
     res.json(result);
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message || 'OCR processing failed' });
@@ -112,6 +141,51 @@ app.post('/api/chatbot/message', authenticate, async (req, res) => {
     res.json(response);
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message || 'Chatbot error' });
+  }
+});
+
+app.get('/api/ocr/latest', authenticate, async (req, res) => {
+  try {
+    const OcrDocument = require('./models/OcrDocument');
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 50) : 10;
+    const filter = req.user.role === 'supervisor'
+      ? {}
+      : req.user.role === 'worker' && req.user.centreId
+        ? { $or: [{ centre_id: req.user.centreId }, { created_by: req.user._id }] }
+        : { created_by: req.user._id };
+    const documents = await OcrDocument.find(filter)
+      .select('original_filename provider confidence document_type review_status firebase_synced createdAt')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+    res.json({ documents });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load recent OCR documents.' });
+  }
+});
+
+app.get('/api/ocr/:id', authenticate, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid OCR document ID.' });
+    const OcrDocument = require('./models/OcrDocument');
+    const document = await OcrDocument.findById(req.params.id).lean();
+    if (!document) return res.status(404).json({ message: 'OCR document not found.' });
+    if (!canAccessOcrDocument(req.user, document)) return res.status(403).json({ message: 'You cannot access this OCR document.' });
+    res.json({
+      document: {
+        id: String(document._id),
+        ...document.analysis,
+        rawText: document.raw_text,
+        confidence: document.confidence,
+        provider: document.provider,
+        ocrDocumentId: String(document._id),
+        storedAt: document.createdAt,
+        firebaseSynced: document.firebase_synced,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load this OCR document.' });
   }
 });
 

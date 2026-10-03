@@ -112,11 +112,23 @@ export const ocrAPI = {
   processDocument: async (file) => {
     const formData = new FormData();
     formData.append('document', file);
-    const response = await fetch('/api/ocr/process', { method: 'POST', body: formData });
+    const token = localStorage.getItem('token');
+    let response;
+    try {
+      response = await fetch('/api/ocr/process', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+    } catch {
+      throw new Error('Cannot reach the backend server. Start it and try again.');
+    }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || 'OCR processing failed');
     return data;
-  }
+  },
+  getLatest: (limit = 10) => request(`/ocr/latest?limit=${limit}`),
+  getById: (id) => request(`/ocr/${id}`),
 };
 
 // Chatbot API

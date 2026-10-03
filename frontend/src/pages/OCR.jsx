@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import { ocrAPI, reportAssistantAPI } from '../services/api';
@@ -36,6 +36,20 @@ const OCR = () => {
   const [error, setError] = useState('');
   const [reviewingId, setReviewingId] = useState('');
   const [activeCandidateId, setActiveCandidateId] = useState('');
+  const [recentDocuments, setRecentDocuments] = useState([]);
+
+  const loadRecentDocuments = async () => {
+    try {
+      const response = await ocrAPI.getLatest(5);
+      setRecentDocuments(response.documents || []);
+    } catch {
+      // The current scan remains available even if the recent-history request fails.
+    }
+  };
+
+  useEffect(() => {
+    loadRecentDocuments();
+  }, []);
 
   const handleFileChange = (event) => {
     setFile(event.target.files?.[0] || null);
@@ -61,8 +75,23 @@ const OCR = () => {
       const response = await ocrAPI.processDocument(file);
       setResult(response.data);
       setActiveCandidateId(response.data.reportCandidates?.[0]?.id || '');
+      loadRecentDocuments();
     } catch (err) {
       setError(err.message || 'OCR processing failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openStoredDocument = async (id) => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await ocrAPI.getById(id);
+      setResult(response.document);
+      setActiveCandidateId(response.document.reportCandidates?.[0]?.id || '');
+    } catch (err) {
+      setError(err.message || 'Could not load this saved OCR document.');
     } finally {
       setLoading(false);
     }
@@ -131,6 +160,24 @@ const OCR = () => {
             </button>
             {error && <div className="error-message">{error}</div>}
 
+            {recentDocuments.length > 0 && (
+              <section className="ocr-section">
+                <h3>Recent scans</h3>
+                <p>Your extracted documents are saved securely for review.</p>
+                <ul>
+                  {recentDocuments.map((document) => (
+                    <li key={document._id}>
+                      <button type="button" className="link-button" onClick={() => openStoredDocument(document._id)} disabled={loading}>
+                        {document.original_filename || 'Untitled document'}
+                      </button>
+                      {' — '}{new Date(document.createdAt).toLocaleString()}
+                      {document.provider && ` (${document.provider === 'google-cloud-vision' ? 'Google Cloud Vision' : 'Local OCR'})`}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
             {result && (
               <div className="ocr-result">
                 <h3>Document Summary</h3>
@@ -138,6 +185,7 @@ const OCR = () => {
                 <div className="result-content">
                   <p><strong>Document type:</strong> {result.documentType || 'Child health report'}</p>
                   {result.summary?.map((line) => <p key={line}>{line}</p>)}
+                  {result.provider && <p><strong>Recognition engine:</strong> {result.provider === 'google-cloud-vision' ? 'Google Cloud Vision' : result.provider === 'tesseract' ? 'Local OCR' : result.provider}</p>}
                   {result.confidence != null && <p><strong>Confidence:</strong> {Number(result.confidence).toFixed(1)}%</p>}
                 </div>
 

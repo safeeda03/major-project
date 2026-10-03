@@ -3,6 +3,15 @@ const path = require('path');
 const Tesseract = require('tesseract.js');
 const pdfParse = require('pdf-parse');
 
+// Google Cloud Vision is optional. Keeping it optional lets the application
+// continue to work locally with Tesseract until a Cloud project is configured.
+let vision = null;
+try {
+  vision = require('@google-cloud/vision');
+} catch (error) {
+  console.warn('Optional Google Cloud Vision OCR is unavailable:', error.message);
+}
+
 // Sharp is only used for optional image enhancement. Keep OCR available on
 // Windows setups where native Sharp binaries may be blocked by policy.
 let sharp = null;
@@ -16,6 +25,8 @@ const DATE_PATTERN = /(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2}
 const VACCINE_PATTERN = /\b(bcg|opv|polio|dpt|pentavalent|mmr|measles|hepatitis\s*b)\b/i;
 const SAMPLE_FOOTER_PATTERN = /sample\s+document\s+prepared\s+for\s+testing\s+the\s+poshanai\s+ocr\s+scanning\s+feature\.?/gi;
 const OCR_CACHE_DIRECTORY = path.join(__dirname, '..', '.cache', 'tesseract');
+const VISION_ENABLED = String(process.env.GOOGLE_CLOUD_VISION_ENABLED || '').toLowerCase() === 'true';
+const OCR_PROVIDER = String(process.env.OCR_PROVIDER || 'auto').toLowerCase();
 
 function getPngDimensions(filePath) {
   try {
@@ -123,82 +134,92 @@ class OCRService {
       let rawText;
       let confidence = null;
       let alternativeTexts = [];
+      let provider = 'tesseract';
 
       if (isText) {
         rawText = fs.readFileSync(file.path, 'utf8').replace(/\r/g, '').trim();
         confidence = 100;
+        provider = 'plain-text';
       } else if (isPdf) {
         const pdf = await pdfParse(fs.readFileSync(file.path));
         rawText = pdf.text.replace(/\r/g, '').trim();
+        provider = 'pdf-text';
       } else {
-        const recognitionOptions = { cachePath: OCR_CACHE_DIRECTORY, tessedit_pageseg_mode: '6' };
-        const attempts = [];
-        for (const pageSegMode of [6, 4, 11]) {
-          attempts.push(await Tesseract.recognize(file.path, 'eng', {
-            ...recognitionOptions,
-            tessedit_pageseg_mode: String(pageSegMode),
-          }));
-        }
-
-        // Full-page OCR can skip text inside bordered tables. A focused pass
-        // over the first data row recovers the common Child Name field.
-        const dimensions = getPngDimensions(file.path);
-        if (dimensions) {
-          const tableWorker = await Tesseract.createWorker({ cachePath: OCR_CACHE_DIRECTORY });
-          try {
-            await tableWorker.loadLanguage('eng');
-            await tableWorker.initialize('eng');
-            attempts.push(await tableWorker.recognize(file.path, {
-              tessedit_pageseg_mode: '6',
-              rectangle: {
-                left: Math.round(dimensions.width * 0.02),
-                top: Math.round(dimensions.height * 0.20),
-                width: Math.round(dimensions.width * 0.96),
-                height: Math.round(dimensions.height * 0.16),
-              },
+        const cloudResult = await this.recognizeWithGoogleVision(file.path);
+        if (cloudResult) {
+          rawText = cloudResult.text;
+          confidence = cloudResult.confidence;
+          provider = 'google-cloud-vision';
+        } else {
+          const recognitionOptions = { cachePath: OCR_CACHE_DIRECTORY, tessedit_pageseg_mode: '6' };
+          const attempts = [];
+          for (const pageSegMode of [6, 4, 11]) {
+            attempts.push(await Tesseract.recognize(file.path, 'eng', {
+              ...recognitionOptions,
+              tessedit_pageseg_mode: String(pageSegMode),
             }));
-            attempts.push(await tableWorker.recognize(file.path, {
-              tessedit_pageseg_mode: '6',
-              rectangle: {
-                left: Math.round(dimensions.width * 0.427),
-                top: Math.round(dimensions.height * 0.201),
-                width: Math.round(dimensions.width * 0.531),
-                height: Math.round(dimensions.height * 0.403),
-              },
-            }));
-          } finally {
-            await tableWorker.terminate();
           }
-        }
-        const original = attempts[0];
 
-        // Handwritten pages photographed on paper often contain pale writing
-        // from the reverse side. Try local contrast cleanup only when the
-        // original OCR confidence is low, and retain the clearest pass.
-        if (original.data.confidence < 65 && sharp) {
-          const baseImage = sharp(file.path).rotate().grayscale().normalize().sharpen();
-          for (const threshold of [130, 110]) {
-            const image = await baseImage.clone().threshold(threshold).png().toBuffer();
-            attempts.push(await Tesseract.recognize(image, 'eng', recognitionOptions));
+          // Full-page OCR can skip text inside bordered tables. A focused pass
+          // over the first data row recovers the common Child Name field.
+          const dimensions = getPngDimensions(file.path);
+          if (dimensions) {
+            const tableWorker = await Tesseract.createWorker({ cachePath: OCR_CACHE_DIRECTORY });
+            try {
+              await tableWorker.loadLanguage('eng');
+              await tableWorker.initialize('eng');
+              attempts.push(await tableWorker.recognize(file.path, {
+                tessedit_pageseg_mode: '6',
+                rectangle: {
+                  left: Math.round(dimensions.width * 0.02),
+                  top: Math.round(dimensions.height * 0.20),
+                  width: Math.round(dimensions.width * 0.96),
+                  height: Math.round(dimensions.height * 0.16),
+                },
+              }));
+              attempts.push(await tableWorker.recognize(file.path, {
+                tessedit_pageseg_mode: '6',
+                rectangle: {
+                  left: Math.round(dimensions.width * 0.427),
+                  top: Math.round(dimensions.height * 0.201),
+                  width: Math.round(dimensions.width * 0.531),
+                  height: Math.round(dimensions.height * 0.403),
+                },
+              }));
+            } finally {
+              await tableWorker.terminate();
+            }
           }
-        }
+          const original = attempts[0];
 
-        const attemptsWithChildName = attempts.filter((attempt) => /child\s*name|name\s+of\s+child/i.test(attempt.data.text || ''));
-        const rankedAttempts = attemptsWithChildName.length ? attemptsWithChildName : attempts;
-        const bestAttempt = rankedAttempts.reduce((best, attempt) => {
-          const score = (candidate) => {
-            const candidateText = candidate.data.text || '';
-            const hasChildName = /child\s*name|name\s+of\s+child/i.test(candidateText);
-            const hasNutrition = /nutrition/i.test(candidateText);
-            return candidate.data.confidence + (hasChildName ? 15 : 0) + (hasNutrition ? 2 : 0);
-          };
-          return score(attempt) > score(best) ? attempt : best;
-        });
-        rawText = bestAttempt.data.text.replace(/\r/g, '').trim();
-        confidence = Number(bestAttempt.data.confidence.toFixed(1));
-        alternativeTexts = attempts
-          .filter((attempt) => attempt !== bestAttempt)
-          .map((attempt) => attempt.data.text.replace(/\r/g, '').trim());
+          // Handwritten pages photographed on paper often contain pale writing
+          // from the reverse side. Try local contrast cleanup only when the
+          // original OCR confidence is low, and retain the clearest pass.
+          if (original.data.confidence < 65 && sharp) {
+            const baseImage = sharp(file.path).rotate().grayscale().normalize().sharpen();
+            for (const threshold of [130, 110]) {
+              const image = await baseImage.clone().threshold(threshold).png().toBuffer();
+              attempts.push(await Tesseract.recognize(image, 'eng', recognitionOptions));
+            }
+          }
+
+          const attemptsWithChildName = attempts.filter((attempt) => /child\s*name|name\s+of\s+child/i.test(attempt.data.text || ''));
+          const rankedAttempts = attemptsWithChildName.length ? attemptsWithChildName : attempts;
+          const bestAttempt = rankedAttempts.reduce((best, attempt) => {
+            const score = (candidate) => {
+              const candidateText = candidate.data.text || '';
+              const hasChildName = /child\s*name|name\s+of\s+child/i.test(candidateText);
+              const hasNutrition = /nutrition/i.test(candidateText);
+              return candidate.data.confidence + (hasChildName ? 15 : 0) + (hasNutrition ? 2 : 0);
+            };
+            return score(attempt) > score(best) ? attempt : best;
+          });
+          rawText = bestAttempt.data.text.replace(/\r/g, '').trim();
+          confidence = Number(bestAttempt.data.confidence.toFixed(1));
+          alternativeTexts = attempts
+            .filter((attempt) => attempt !== bestAttempt)
+            .map((attempt) => attempt.data.text.replace(/\r/g, '').trim());
+        }
       }
       rawText = rawText.replace(SAMPLE_FOOTER_PATTERN, '').replace(/\n{3,}/g, '\n\n').trim();
       // Keep the highest-ranked OCR pass intact. Merging every segmentation
@@ -222,6 +243,7 @@ class OCRService {
           reportCandidates,
           rawText: completeText,
           confidence,
+          provider,
           needsVerification: true,
         },
         message: completeText
@@ -232,9 +254,49 @@ class OCRService {
       };
     } catch (cause) {
       console.error('OCR processing failed:', cause.message);
+      if (cause.statusCode === 503) throw cause;
       const error = new Error('Could not read this image. Use a clear JPG, PNG, or WebP image and try again.');
       error.statusCode = 422;
       throw error;
+    }
+  }
+
+  static async recognizeWithGoogleVision(filePath) {
+    if (!VISION_ENABLED || OCR_PROVIDER === 'tesseract') return null;
+
+    if (!vision) {
+      if (OCR_PROVIDER === 'google-cloud-vision') {
+        const error = new Error('Google Cloud Vision is selected but its package is not installed.');
+        error.statusCode = 503;
+        throw error;
+      }
+      return null;
+    }
+
+    try {
+      const client = new vision.ImageAnnotatorClient();
+      const [result] = await client.documentTextDetection(filePath);
+      const annotation = result.fullTextAnnotation;
+      const text = String(annotation?.text || '').replace(/\r/g, '').trim();
+      if (!text) throw new Error('Google Cloud Vision returned no readable text.');
+
+      const confidences = (annotation?.pages || [])
+        .flatMap((page) => page.blocks || [])
+        .map((block) => Number(block.confidence))
+        .filter((value) => Number.isFinite(value) && value >= 0)
+        .map((value) => value <= 1 ? value * 100 : value);
+      const confidence = confidences.length
+        ? Number((confidences.reduce((sum, value) => sum + value, 0) / confidences.length).toFixed(1))
+        : null;
+      return { text, confidence };
+    } catch (cause) {
+      if (OCR_PROVIDER === 'google-cloud-vision') {
+        const error = new Error(`Google Cloud Vision OCR failed: ${cause.message}`);
+        error.statusCode = 503;
+        throw error;
+      }
+      console.warn(`Google Cloud Vision OCR unavailable; using local Tesseract instead: ${cause.message}`);
+      return null;
     }
   }
 

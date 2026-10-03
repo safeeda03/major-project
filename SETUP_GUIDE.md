@@ -109,6 +109,41 @@ VITE v4.x.x ready in xxx ms
 
 OCR works with JPG, PNG, and WebP images up to 10 MB. The Android app requests camera access only when the user chooses to scan, and microphone access only when they choose voice input.
 
+### Improve handwritten OCR with Google Cloud Vision
+
+The project uses local Tesseract OCR by default, so it works without a cloud account. For better recognition of handwritten board or form content, enable Google Cloud Vision as follows:
+
+1. Create a Google Cloud project, enable billing, and enable the Cloud Vision API.
+2. Create a service account that can use Vision, then download its JSON key to a secure location outside this repository.
+3. In `backend/.env`, set:
+
+```env
+GOOGLE_CLOUD_VISION_ENABLED=true
+OCR_PROVIDER=auto
+GOOGLE_APPLICATION_CREDENTIALS=C:/secure/poshanai-vision-service-account.json
+```
+
+4. Restart the backend. The OCR screen will show `Google Cloud Vision` when it is being used. If the cloud service is temporarily unavailable, `auto` safely falls back to local OCR. Set `OCR_PROVIDER=google-cloud-vision` if you want the upload to fail instead of falling back.
+
+Google Cloud Vision is used for image uploads. The current PDF path extracts selectable PDF text; scanned PDF support needs Google's asynchronous Cloud Storage batch workflow.
+
+### Keep the latest scan in Firebase in real time
+
+Every OCR result is saved in the project's MongoDB database for authenticated review. Firebase Realtime Database can also receive each result and a per-centre `latest` record. This is optional and disabled by default because scanned reports may contain sensitive health data.
+
+1. Add a Realtime Database to the same Firebase/Google Cloud project used for Vision.
+2. Use the service-account JSON already configured through `GOOGLE_APPLICATION_CREDENTIALS` and give it access to the Firebase project.
+3. Add the database URL from Firebase Console to `backend/.env`:
+
+```env
+FIREBASE_OCR_SYNC_ENABLED=true
+FIREBASE_DATABASE_URL=https://your-project-default-rtdb.firebaseio.com
+```
+
+4. Restart the backend. The server writes each document to `ocrDocuments/<document-id>` and updates `ocrLatest/<centre-id>` at the same time. If Firebase is unavailable, the uploaded OCR result is still retained in MongoDB and marked as not synced.
+
+Before enabling this in production, set Firebase Realtime Database rules so only authenticated, authorized application users can read the OCR paths. Do not place a Firebase service-account key in the frontend, Android app, or Git repository.
+
 To enable real AI answers, copy `backend/.env.example` to `backend/.env`, add your server-side `OPENAI_API_KEY`, and restart the backend. Do not put that key in the mobile or frontend app. Set `OPENAI_ENABLE_WEB_SEARCH=true` only if you want the provider to search for current information.
 
 The Android debug build requires JDK 17. In PowerShell, set `JAVA_HOME` to your JDK 17 directory before running `mobile/android/gradlew.bat :app:assembleDebug`.
